@@ -1,0 +1,28 @@
+defaults:
+  - custom
+
+_target_: gschnet.datasets.QM9Gen
+
+placement_cutoff: ${globals.placement_cutoff}
+use_covalent_radii: ${globals.use_covalent_radii}
+covalent_radius_factor: ${globals.covalent_radius_factor}
+datapath: ${run.data_dir}/qm9.db  # data_dir is specified in train.yaml
+batch_size: 5
+num_train: 50000
+num_val: 5000
+remove_uncharacterized: True
+num_workers: 6
+num_val_workers: 4
+num_test_workers: 4
+
+# convert to typically used units
+distance_unit: Ang
+property_units:
+  energy_U0: eV
+  energy_U: eV
+  enthalpy_H: eV
+  free_energy: eV
+  homo: eV
+  lumo: eV
+  gap: eV
+  zpve: eV

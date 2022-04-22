@@ -1,0 +1,70 @@
+# @package _global_
+
+defaults:
+  - override /data: gschnet_qm9
+  - override /task: gschnet_task
+  - override /model: gschnet
+  - override /model/conditioning: comp_relenergy
+
+run:
+  path: models/qm9_${globals.name}
+  id: ${globals.id}
+
+globals:
+  model_cutoff: 5.
+  prediction_cutoff: 4.
+  placement_cutoff: 1.7
+  use_covalent_radii: True
+  covalent_radius_factor: 1.1
+  atom_types: [1, 6, 7, 8, 9]
+  origin_type: 2
+  focus_type: 3
+  stop_type: 4
+  lr: 1e-4
+  draw_random_samples: 0
+  name: comp_relenergy
+  id: ${oc.env:JOB_ID,${uuid:1}}_${oc.env:HOSTNAME,""}
+  temp_dir: ${temp_dir:_qm9}
+
+trainer:
+  progress_bar_refresh_rate: 25000
+  amp_level: null
+
+callbacks:
+  early_stopping:
+    patience: 25
+
+data:
+  batch_size: 5
+  num_train: 50000
+  num_val: 5000
+  data_workdir: ${globals.temp_dir}/data
+  transforms:
+    - _target_: schnetpack.transform.SubtractCenterOfMass
+    - _target_: gschnet.transform.OrderByDistanceToOrigin
+    - _target_: gschnet.transform.GetComposition
+      atom_types: ${globals.atom_types}
+    - _target_: gschnet.transform.GetRelativeAtomicEnergy
+      atom_types: ${globals.atom_types}
+      target_energy_name: energy_U0
+      max_train_points: 5000
+    - _target_: gschnet.transform.GeneralCachedNeighborList
+      cache_path: ${run.work_dir}/cache
+      keep_cache: False
+      cache_workdir: ${globals.temp_dir}/cache
+      neighbor_list:
+        _target_: gschnet.transform.ConditionalGSchNetNeighborList
+        model_cutoff: ${globals.model_cutoff}
+        prediction_cutoff: ${globals.prediction_cutoff}
+        placement_cutoff: ${globals.placement_cutoff}
+        environment_provider: ase
+        use_covalent_radii: ${globals.use_covalent_radii}
+        covalent_radius_factor: ${globals.covalent_radius_factor}
+    - _target_: gschnet.transform.BuildAtomsTrajectory
+      centered: True
+      origin_type: ${globals.origin_type}
+      focus_type: ${globals.focus_type}
+      stop_type: ${globals.stop_type}
+      draw_random_samples: ${globals.draw_random_samples}
+      sort_idx_i: False
+    - _target_: schnetpack.transform.CastTo32

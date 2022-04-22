@@ -1,0 +1,25 @@
+_target_: gschnet.ConditioningModule
+n_features: 128
+n_layers: 5
+condition_embeddings:
+  - _target_: gschnet.CompositionEmbedding
+    atom_types: ${globals.atom_types}
+    n_atom_basis: 16
+    n_features_concentration: 64
+    n_layers_concentration: 3
+    n_features_n_atoms: 64
+    n_layers_n_atoms: 3
+    condition_min_n_atoms: 0.
+    condition_max_n_atoms: 35.
+    grid_spacing_n_atoms: 8.75
+  - _target_: gschnet.ScalarConditionEmbedding
+    condition_name: relative_atomic_energy
+    condition_type: trajectory
+    condition_min: -0.2
+    condition_max: 0.2
+    grid_spacing: 0.1
+    n_features: 64
+    n_layers: 3
+    required_data_properties:
+      - energy_U0
+

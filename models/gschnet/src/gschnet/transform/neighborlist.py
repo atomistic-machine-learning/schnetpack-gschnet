@@ -29,6 +29,7 @@ __all__ = [
 class CacheException(Exception):
     pass
 
+
 class GeneralCachedNeighborList(Transform):
     """
     Dynamic caching of neighbor lists.
@@ -587,4 +588,3 @@ def sort_j_parallel(n_nbhs, j):
     idcs[1:, :] += torch.cumsum(n_nbhs[:-1], dim=0).reshape(-1, 1)
     # return sorted j indices and the sorting indices
     return s[mask], idcs[mask]
-

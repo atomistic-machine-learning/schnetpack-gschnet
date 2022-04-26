@@ -22,6 +22,8 @@ def generate_molecules(
 
     # load model
     model = torch.load(model_path, map_location=torch.device("cpu"))
+    if not hasattr(model, "legacy_type_normalization"):
+        model.legacy_type_normalization = True
     # check if all conditions required by the model are provided
     condition_names = model.get_condition_names()
     for condition_type in condition_names:
@@ -347,14 +349,14 @@ if __name__ == "__main__":
     with torch.no_grad():
         generate_molecules(
             "/home/niklas/phd/experiments/spk_runs/models/qm9_comp_relenergy/"
-            "700740_node02.ml.tu-berlin.de/best_inference_model",
-            10,
+            "old_type_distribution_cv_radii/best_inference_model",
+            100,
             35,
             0.7,
             0.05,
             {
                 "trajectory": {
-                    "relative_atomic_energy": -0.1,
+                    "relative_atomic_energy": 0.1,
                     "composition": [10, 7, 0, 2, 0],
                 }
             },

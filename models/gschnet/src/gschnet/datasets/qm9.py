@@ -21,7 +21,7 @@ from schnetpack.data import (
     BaseAtomsData,
     create_dataset,
     load_dataset,
-    AtomsDataModuleError
+    AtomsDataModuleError,
 )
 
 __all__ = ["QM9Gen"]

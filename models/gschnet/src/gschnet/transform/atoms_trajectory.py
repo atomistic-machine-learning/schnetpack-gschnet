@@ -538,4 +538,3 @@ class BuildAtomsTrajectory(Transform):
         # print(f'Needed {first_stop:.5f}+{second_stop:.5f}+{last_stop:.5f}='
         # f'{first_stop+second_stop+last_stop:.5f}s')
         return inputs
-

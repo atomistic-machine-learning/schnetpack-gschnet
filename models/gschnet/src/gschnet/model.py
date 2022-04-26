@@ -44,8 +44,10 @@ class ConditionalGenerativeSchNet(AtomisticModel):
         placement_cutoff: float,
         conditioning: ConditioningModule = None,
         type_prediction_n_layers: int = 5,
+        type_prediction_n_hidden: List[int] = None,
         type_prediction_activation: Callable = shifted_softplus,
         distance_prediction_n_layers: int = 5,
+        distance_prediction_n_hidden: List[int] = None,
         distance_prediction_activation: Callable = shifted_softplus,
         distance_prediction_n_bins: int = 301,
         distance_prediction_min_dist: float = 0.0,
@@ -53,6 +55,7 @@ class ConditionalGenerativeSchNet(AtomisticModel):
         postprocessors: Optional[List[Transform]] = None,
         input_dtype: torch.dtype = torch.float32,
         enable_postprocess: bool = False,
+        legacy_type_normalization: bool = False,
     ):
         """
         Args:
@@ -75,10 +78,20 @@ class ConditionalGenerativeSchNet(AtomisticModel):
             conditioning: Module that embeds the conditions, e.g. the composition or a
                 target property value. Set None to train an unconditional model.
             type_prediction_n_layers: Number of layers in the type prediction network.
+            type_prediction_n_hidden: List with number of neurons in the hidden layers
+                of the type prediction network. Set None to have a block structure where
+                each hidden layer has as many neurons as the number of inputs in the
+                first layer (i.e. number of features from SchNet + number of features
+                from the conditioning module).
             type_prediction_activation: Activation function used in the type prediction
                 network after all but the last layer.
             distance_prediction_n_layers: Number of layers in the distance prediction
                 network.
+            distance_prediction_n_hidden: List with number of neurons in the hidden
+                layers of the distance prediction network. Set None to have a block
+                structure where each hidden layer has as many neurons as the number of
+                inputs in the first layer (i.e. number of features from SchNet + number
+                of features from the conditioning module).
             distance_prediction_activation: Activation function used in the distance
                 prediction network after all but the last layer.
             distance_prediction_n_bins: Number of bins (i.e. output neurons) for the
@@ -92,6 +105,10 @@ class ConditionalGenerativeSchNet(AtomisticModel):
                 `datamodule`, but are not applied during training.
             input_dtype: The dtype of real inputs.
             enable_postprocess: If true, post-processing is applied.
+            legacy_type_normalization: If true, the distribution of the atom types will
+                be normalized as in previous implementations of G-SchNet, i.e. taking
+                the softmax over all types, multiplying the predictions of all previous
+                atoms for each type, and taking the softmax over all types again.
         """
         super().__init__(
             input_dtype=input_dtype,
@@ -141,30 +158,35 @@ class ConditionalGenerativeSchNet(AtomisticModel):
         )
 
         # initialize type and distance prediction networks
+        if type_prediction_n_hidden is None:
+            type_prediction_n_hidden = n_features
         self.type_prediction_net = build_mlp(
             n_in=n_features,
             n_out=len(self._all_types),
-            n_hidden=n_features,
+            n_hidden=type_prediction_n_hidden,
             n_layers=type_prediction_n_layers,
             activation=type_prediction_activation,
-        )
-        self.distance_prediction_net = build_mlp(
-            n_in=n_features,
-            n_out=distance_prediction_n_bins,
-            n_hidden=n_features,
-            n_layers=distance_prediction_n_layers,
-            activation=distance_prediction_activation,
         )
         self.next_type_embedding = nn.Embedding(
             representation.embedding.num_embeddings,
             representation.n_atom_basis,
             padding_idx=0,
         )
+        if distance_prediction_n_hidden is None:
+            distance_prediction_n_hidden = n_features
+        self.distance_prediction_net = build_mlp(
+            n_in=n_features,
+            n_out=distance_prediction_n_bins,
+            n_hidden=distance_prediction_n_hidden,
+            n_layers=distance_prediction_n_layers,
+            activation=distance_prediction_activation,
+        )
 
         self.softmax = nn.Softmax(dim=-1)
         self.logsoftmax = nn.LogSoftmax(dim=-1)
 
         self.collect_derivatives()
+        self.legacy_type_normalization = legacy_type_normalization
 
     def forward(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
         # extract atom-wise features from placed atoms
@@ -207,34 +229,37 @@ class ConditionalGenerativeSchNet(AtomisticModel):
         # get predictions for the type of the next atom (from all atoms within the
         # prediction cutoff)
         predictions = self.type_prediction_net(inputs["representation"])
-        # # normalize these to get distributions
-        # predictions = self.softmax(predictions)
-        # # sum the distributions of all neighbors
-        # predictions = scatter_add(
-        #     predictions,
-        #     inputs[properties.pred_idx_m],
-        #     len(inputs[properties.n_pred_nbh]),
-        #     0,
-        # )
-        # # normalize by dividing by the number of neighbors
-        # distribution = predictions / inputs[properties.n_pred_nbh][..., None]
-        # if use_log_probabilities:
-        #     inputs[properties.distribution_Z] = torch.log(distribution + 1e-12)
-        # else:
-        #     inputs[properties.distribution_Z] = distribution
-        # normalize these to get distributions
-        predictions = self.logsoftmax(predictions)
-        # sum the distributions of all neighbors
-        predictions = scatter_add(
-            predictions,
-            inputs[properties.pred_idx_m],
-            len(inputs[properties.n_pred_nbh]),
-            0,
-        )
-        if use_log_probabilities:
-            inputs[properties.distribution_Z] = self.logsoftmax(predictions)
+        if not self.legacy_type_normalization:
+            # normalize these to get distributions
+            predictions = self.softmax(predictions)
+            # sum the distributions of all neighbors
+            predictions = scatter_add(
+                predictions,
+                inputs[properties.pred_idx_m],
+                len(inputs[properties.n_pred_nbh]),
+                0,
+            )
+            # normalize by dividing by the number of neighbors
+            distribution = predictions / inputs[properties.n_pred_nbh][..., None]
+            if use_log_probabilities:
+                inputs[properties.distribution_Z] = torch.log(distribution + 1e-12)
+            else:
+                inputs[properties.distribution_Z] = distribution
         else:
-            inputs[properties.distribution_Z] = self.softmax(predictions)
+            # normalize these to get log distributions
+            predictions = self.logsoftmax(predictions)
+            # multiply the distributions of all neighbors
+            predictions = scatter_add(
+                predictions,
+                inputs[properties.pred_idx_m],
+                len(inputs[properties.n_pred_nbh]),
+                0,
+            )
+            # normalize with softmax again
+            if use_log_probabilities:
+                inputs[properties.distribution_Z] = self.logsoftmax(predictions)
+            else:
+                inputs[properties.distribution_Z] = self.softmax(predictions)
         return inputs
 
     def predict_distances(

@@ -1,0 +1,22 @@
+name: CI Master
+
+on:
+  push:
+    branches: [ main, dev ]
+  pull_request:
+    branches: [ main, dev ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: [3.8]
+
+    steps:
+    - uses: actions/checkout@v2
+    - uses: psf/black@stable
+      with:
+          options: "-v -l 88 --check --diff /models"

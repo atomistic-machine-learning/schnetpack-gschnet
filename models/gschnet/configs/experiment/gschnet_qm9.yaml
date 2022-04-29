@@ -24,7 +24,7 @@ globals:
   draw_random_samples: 0
   name: comp_relenergy
   id: ${oc.env:JOB_ID,${uuid:1}}_${oc.env:HOSTNAME,""}
-  temp_dir: ${temp_dir:_qm9}
+  temp_dir: ${tmpdir:_qm9}
 
 trainer:
   progress_bar_refresh_rate: 25000

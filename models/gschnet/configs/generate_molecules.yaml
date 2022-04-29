@@ -1,0 +1,54 @@
+# @package _global_
+defaults:
+  - conditions: no_conditions
+
+modeldir: ???
+outputfile: generated_molecules.db
+generate:
+  n_molecules: 35
+  batch_size: 10
+  max_n_atoms: 35
+  grid_distance_min: 0.7
+  grid_spacing: 0.05
+  temperature_term: 0.1
+
+use_gpu: False
+print_config: True
+view_molecules: True
+
+# hydra configuration
+hydra:
+    # output paths for hydra logs
+    run:
+        dir: ${modeldir}
+
+    # disable hydra config storage, since handled manually
+    output_subdir: null
+
+    help:
+      app_name: SchNetPack.Modelzoo G-SchNet Predict
+
+      template: |-
+        SchNetPack
+
+        == Configuration groups ==
+        Compose your configuration from those groups (db=mysql)
+
+        $APP_CONFIG_GROUPS
+
+        == Config ==
+        This is the config generated for this run.
+        You can change the config file to be loaded to a predefined one
+        > gschnet_generate --config-name=train_qm9
+
+        or your own:
+        > gschnet_generate --config-dir=./my_configs --config-name=my_config
+
+        You can override everything, for example:
+        > gschnet_generate --config-name=train_qm9 data_dir=/path/to/datadir data.batch_size=50 --help
+
+        -------
+        $CONFIG
+        -------
+
+        ${hydra.help.footer}

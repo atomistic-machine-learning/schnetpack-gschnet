@@ -320,6 +320,9 @@ class ConditionalGenerativeSchNet(AtomisticModel):
             classes = dists.long()
         return classes
 
+    def get_available_atom_types(self):
+        return self._all_types[:-1]
+
 
 class ConditioningModule(nn.Module):
     """

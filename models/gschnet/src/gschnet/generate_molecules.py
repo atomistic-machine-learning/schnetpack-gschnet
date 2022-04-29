@@ -1,5 +1,5 @@
 import torch
-import properties
+from gschnet import properties
 from schnetpack.nn.scatter import scatter_add
 from torch.functional import F
 from ase.db import connect
@@ -9,19 +9,17 @@ __all__ = ["generate_molecules"]
 
 
 def generate_molecules(
-    model_path: str,
+    model: torch.nn.Module,
     n_molecules: int,
     max_n_atoms: int,
     grid_distance_min: float,
     grid_spacing: float,
     conditions: dict,
-    db_path: str,
+    device: torch.device,
     t: float = 0.1,
 ):
     # ================================ initialization ================================
 
-    # load model
-    model = torch.load(model_path, map_location=torch.device("cpu"))
     if not hasattr(model, "legacy_type_normalization"):
         model.legacy_type_normalization = True
     # check if all conditions required by the model are provided
@@ -34,41 +32,44 @@ def generate_molecules(
                     f"not  provided in `conditions`!"
                 )
     # initialize tensors for positions and atom types generated molecules
-    R = torch.zeros((n_molecules, max_n_atoms + 2, 3))
-    Z = torch.zeros((n_molecules, max_n_atoms + 3), dtype=torch.long)
+    R = torch.zeros((n_molecules, max_n_atoms + 2, 3), device=device)
+    Z = torch.zeros((n_molecules, max_n_atoms + 3), dtype=torch.long, device=device)
     # the first two types are the focus and origin type
-    Z[:, [0, 1]] = torch.tensor([model.focus_type, model.origin_type], dtype=torch.long)
+    Z[:, [0, 1]] = torch.tensor(
+        [model.focus_type, model.origin_type], dtype=torch.long, device=device
+    )
     # initialize tensors for the pairwise distances and neighborhoods (connectivity)
     # neighborhood inside the model cutoff is gathered as idx_m, idx_i, idx_j pairs
-    gathered_mij_idcs = torch.zeros((3, 0), dtype=torch.long)
-    gathered_r_ij = torch.zeros(0)  # also gather distances between atoms at idx_i/j
+    gathered_mij_idcs = torch.zeros((3, 0), dtype=torch.long, device=device)
+    # also gather distances between atoms at idx_i/j
+    gathered_r_ij = torch.zeros(0, device=device)
     # neighborhood inside prediction cutoff is stored in connectivity matrices where
     # the rows do not contain origin and focus token but the columns do
     nbh_prediction = torch.zeros(
-        (n_molecules, max_n_atoms, max_n_atoms + 2), dtype=bool
+        (n_molecules, max_n_atoms, max_n_atoms + 2), dtype=bool, device=device
     )
     # origin token, focus token, and focus atom are always used for prediction
     # therefore we set their values to 1 in the connectivity matrices
     nbh_prediction[:, :, :2] = 1  # set origin token and focus token
     torch.diagonal(nbh_prediction, offset=2, dim1=1, dim2=2)[:] = 1  # set focus atom
     # we will also store the number of atoms used for prediction (changes each step)
-    n_nbh_prediction = torch.zeros(n_molecules, dtype=torch.long)
+    n_nbh_prediction = torch.zeros(n_molecules, dtype=torch.long, device=device)
     # initialize tensors that tell which of the molecules are finished
-    unfinished_molecules = torch.ones(n_molecules, dtype=bool)
+    unfinished_molecules = torch.ones(n_molecules, dtype=bool, device=device)
     finished_list = []  # records the order in which molecules where finished
     # initialize tensors that tell which atoms are available as focus
-    available_atoms = torch.ones((n_molecules, max_n_atoms))
+    available_atoms = torch.ones((n_molecules, max_n_atoms), device=device)
     # initialize tensor for the current focus atom in each molecule
-    focus = torch.zeros(n_molecules, dtype=torch.long)
+    focus = torch.zeros(n_molecules, dtype=torch.long, device=device)
     # initialize 3d grid of candidate positions for atom placement
     grid_3d = get_3d_grid(
         distance_min=grid_distance_min,
         distance_max=float(model.placement_cutoff),
         grid_spacing=grid_spacing,
-    )
+    ).to(device)
     # initialize "1d" grid that only extends into x-direction for the very first step
     # where we sample the position of the first atom only from the focus and origin
-    grid_1d = torch.zeros((model.n_distance_bins, 3))
+    grid_1d = torch.zeros((model.n_distance_bins, 3), device=device)
     grid_1d[:, 0] = torch.linspace(
         model.distance_min, model.distance_max, model.n_distance_bins
     )
@@ -85,7 +86,7 @@ def generate_molecules(
         inputs[properties.R] = R[mask, :_i].flatten(end_dim=-2)
         inputs[properties.Z] = Z[mask, :_i].flatten()  # extract and flatten atom types
         # number of atoms per molecule
-        inputs[properties.n_atoms] = torch.full((n_mols,), fill_value=_i)
+        inputs[properties.n_atoms] = torch.full((n_mols,), fill_value=_i, device=device)
         # neighborhood defined by model cutoff (center atoms i and neighbors j)
         # extract idx_m, idx_i, idx_j pairs and r_ij of molecules selected in mask
         gathered_mask = mask[gathered_mij_idcs[0]]
@@ -101,29 +102,31 @@ def generate_molecules(
             token_atom_pairs = torch.cat(
                 [
                     torch.where(mask)[0][None],
-                    torch.zeros((1, n_mols), dtype=torch.long),
+                    torch.zeros((1, n_mols), dtype=torch.long, device=device),
                     focus[None, mask] + 2,
                 ],
                 dim=0,
             )
             focus_mij = torch.cat([focus_mij, token_atom_pairs], dim=-1)
-            focus_r_ij = torch.cat([focus_r_ij, torch.zeros(n_mols)], dim=0)
+            focus_r_ij = torch.cat(
+                [focus_r_ij, torch.zeros(n_mols, device=device)], dim=0
+            )
         else:  # in the first step there are only origin and focus, both at (0, 0, 0)
-            focus_mij = torch.zeros((3, n_mols), dtype=torch.long)
+            focus_mij = torch.zeros((3, n_mols), dtype=torch.long, device=device)
             focus_mij[0] = torch.arange(n_mols)  # each molecule has exactly one pair
             focus_mij[2] = 1  # idx_j for origin is one
-            focus_r_ij = torch.zeros(n_mols)  # the distance between tokens is zero
+            focus_r_ij = torch.zeros(n_mols, device=device)  # dist between tokens=zero
         # append to other mij_idcs and r_ij
         mij_idcs = torch.cat([mij_idcs, focus_mij, focus_mij[[0, 2, 1]]], dim=-1)
         r_ij = torch.cat([r_ij, focus_r_ij, focus_r_ij], dim=-1)
         # get offset for idx_i and idx_j (i.e. local idx_m * (n_atoms+n_tokens))
-        local_idx_m = torch.empty(n_molecules, dtype=torch.long)
-        local_idx_m[mask] = torch.arange(n_mols)
+        local_idx_m = torch.empty(n_molecules, dtype=torch.long, device=device)
+        local_idx_m[mask] = torch.arange(n_mols, device=device)
         offset = local_idx_m[mij_idcs[0]] * _i
         inputs[properties.idx_i] = mij_idcs[1] + offset
         inputs[properties.idx_j] = mij_idcs[2] + offset
         inputs[properties.r_ij] = r_ij
-        inputs[properties.offsets] = torch.zeros((len(mij_idcs[0]), 3))
+        inputs[properties.offsets] = torch.zeros((len(mij_idcs[0]), 3), device=device)
         # extract neighborhood of current focus (these atoms are used for prediction)
         focus_nbh = torch.where(nbh_prediction[mask, focus[mask], :_i])
         inputs[properties.pred_idx_m] = focus_nbh[0]
@@ -135,7 +138,9 @@ def generate_molecules(
         inputs["local_" + properties.pred_idx_j] = focus_nbh[1]
         # repeat conditions of type "trajectory" for every atom in focus_nbh
         for condition_name in condition_names["trajectory"]:
-            condition = torch.tensor(conditions["trajectory"][condition_name])
+            condition = torch.tensor(
+                conditions["trajectory"][condition_name], device=device
+            )
             s = condition.size()
             inputs[condition_name] = condition.expand(len(focus_nbh[0]), *s).squeeze()
         return inputs
@@ -151,7 +156,7 @@ def generate_molecules(
         # mask telling which molecules the next type needs to be predicted for
         mol_mask = unfinished_molecules.clone()
         # keeps track of which molecules were finished in this step
-        finished_this_step = torch.zeros(n_molecules, dtype=bool)
+        finished_this_step = torch.zeros(n_molecules, dtype=bool, device=device)
         # will store the sampled next atom type
         next_types = Z[:, _i]
         # stores representation extracted by the model (for distance predictions)
@@ -168,7 +173,9 @@ def generate_molecules(
             ).squeeze()
             # set position of focus token (first entry in R) accordingly
             if i > 0:  # not required in first step (origin and focus at (0, 0, 0))
-                R_focus = R[mol_mask, 2:][torch.arange(mol_mask.sum()), focus[mol_mask]]
+                R_focus = R[mol_mask, 2:][
+                    torch.arange(mol_mask.sum(), device=device), focus[mol_mask]
+                ]
                 R[mol_mask, 0] = R_focus
                 R[mol_mask, :_i] -= R_focus[:, None]  # center positions on focus
             # build inputs dictionary for network
@@ -223,7 +230,7 @@ def generate_molecules(
         representation = torch.cat(representation, dim=0)
         inputs = {
             "representation": representation,
-            properties.pred_r_ij_idcs: torch.arange(len(representation)),
+            properties.pred_r_ij_idcs: torch.arange(len(representation), device=device),
             properties.next_Z: torch.repeat_interleave(
                 next_types[mol_order], n_nbh_prediction[mol_order]
             ),
@@ -233,7 +240,7 @@ def generate_molecules(
         prediction = inputs[properties.distribution_r_ij]
         # compute distances between these atoms and the candidate grid positions
         idx_m_local = torch.repeat_interleave(
-            torch.arange(len(mol_order)), n_nbh_prediction[mol_order]
+            torch.arange(len(mol_order), device=device), n_nbh_prediction[mol_order]
         )
         idx_m = mol_order[idx_m_local]
         dist_pred_idx_j = torch.cat(dist_pred_idx_j)
@@ -279,13 +286,7 @@ def generate_molecules(
         new_mij = torch.cat(
             [
                 mol_order[in_model_cutoff[0]][None],
-                torch.full(
-                    (
-                        1,
-                        len(in_model_cutoff[0]),
-                    ),
-                    fill_value=_i,
-                ),
+                torch.full((1, len(in_model_cutoff[0])), fill_value=_i, device=device),
                 in_model_cutoff[1][None],
             ],
             dim=0,
@@ -306,15 +307,7 @@ def generate_molecules(
         nbh_prediction[:, i, 2:][in_pred_m, in_pred_j] = True  # update rows
         nbh_prediction[:, :, _i][in_pred_m, in_pred_j] = True  # update columns
 
-    # ====================== store generated molecules into db ======================
-
-    with connect(db_path) as con:
-        print(finished_list)
-        for idx, n_atoms in finished_list:
-            at = Atoms(
-                numbers=Z[idx, 2 : n_atoms + 2], positions=R[idx, 2 : n_atoms + 2]
-            )
-            con.write(at)
+    return R, Z, finished_list
 
 
 def get_3d_grid(distance_min: float, distance_max: float, grid_spacing: float):

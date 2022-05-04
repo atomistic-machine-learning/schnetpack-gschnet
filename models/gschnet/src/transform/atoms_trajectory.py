@@ -1,15 +1,8 @@
 from typing import Dict, Optional, List, Tuple
-
-import os
-import shutil
-
-from dirsync import sync
 import logging
 import torch
-from ase import Atoms
 from schnetpack.transform.base import Transform
-import fasteners
-import gschnet.properties as properties
+from src import properties
 
 logger = logging.getLogger(__name__)
 

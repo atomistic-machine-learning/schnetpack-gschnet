@@ -4,13 +4,13 @@ from typing import Optional, Dict, List, Type, Any, Union
 import pytorch_lightning as pl
 import torch
 from torch import nn as nn
-from gschnet.transform import (
+from src.transform import (
     BuildAtomsTrajectory,
     GeneralCachedNeighborList,
     ConditionalGSchNetNeighborList,
 )
-from gschnet import ConditionalGenerativeSchNet
-import gschnet.properties as properties
+from src.model import ConditionalGenerativeSchNet
+from src import properties
 
 __all__ = ["ConditionalGenerativeSchNetTask"]
 

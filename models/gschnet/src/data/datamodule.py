@@ -21,7 +21,7 @@ from schnetpack.data import (
     AtomsDataModule,
     AtomsDataModuleError,
 )
-from gschnet.data import gschnet_collate_fn
+from src.data import gschnet_collate_fn
 
 __all__ = ["GenerativeAtomsDataModule"]
 

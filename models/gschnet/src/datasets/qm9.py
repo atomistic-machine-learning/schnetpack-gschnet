@@ -14,8 +14,8 @@ from ase.io.extxyz import read_xyz
 from tqdm import tqdm
 
 import torch
-from gschnet.data import GenerativeAtomsDataModule
-import gschnet.properties as properties
+from src.data import GenerativeAtomsDataModule
+from src import properties
 from schnetpack.data import (
     AtomsDataFormat,
     BaseAtomsData,

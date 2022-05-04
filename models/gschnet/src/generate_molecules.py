@@ -1,9 +1,8 @@
 import torch
-from gschnet import properties
+import math
+from src import properties
 from schnetpack.nn.scatter import scatter_add
 from torch.functional import F
-from ase.db import connect
-from ase import Atoms
 
 __all__ = ["generate_molecules"]
 
@@ -17,6 +16,7 @@ def generate_molecules(
     conditions: dict,
     device: torch.device,
     t: float = 0.1,
+    grid_batch_size: float = -1,
 ):
     # ================================ initialization ================================
 
@@ -26,10 +26,13 @@ def generate_molecules(
     condition_names = model.get_condition_names()
     for condition_type in condition_names:
         for condition_name in condition_names[condition_type]:
-            if condition_name not in conditions[condition_type]:
+            if (
+                conditions[condition_type] is None
+                or condition_name not in conditions[condition_type]
+            ):
                 raise ValueError(
-                    f"The condition '{condition_name}' is required by the model but "
-                    f"not  provided in `conditions`!"
+                    f"The condition `{condition_name}` is required by the model but "
+                    f'not  provided in `conditions["{condition_type}"]`!'
                 )
     # initialize tensors for positions and atom types generated molecules
     R = torch.zeros((n_molecules, max_n_atoms + 2, 3), device=device)
@@ -246,16 +249,30 @@ def generate_molecules(
         dist_pred_idx_j = torch.cat(dist_pred_idx_j)
         pos = R[idx_m, dist_pred_idx_j]  # positions of relevant atoms
         grid = grid_1d if i == 0 else grid_3d  # choose special grid in very first step
-        dists = cdists(pos, grid)  # pairwise distances
-        # map distances to bins (of the distance distribution from the network output)
-        bins = model.dists_to_classes(dists, in_place=True)
-        del dists
-        # lookup of log probabilities of these distances in the network output
-        log_p_atom = torch.gather(prediction, dim=1, index=bins)
-        del bins
-        # multiply probabilities of all neighbors at candidate positions (add log_p)
-        log_p_mol = scatter_add(log_p_atom, idx_m_local, dim_size=len(mol_order), dim=0)
-        del log_p_atom
+        # run calculations over positional grid in batches if desired (since the grids
+        # require a lot of memory, this can help to speed up computations by allowing
+        # larger batches of molecules for generation, i.e. the memory demands of the
+        # model forward pass and the computations on the grid are aligned)
+        if grid_batch_size == -1:
+            n_batches = 1
+        else:
+            n_batches = math.ceil(len(idx_m) / grid_batch_size)
+        log_p_mol = torch.zeros((len(mol_order), len(grid)), device=device)
+        for b in range(n_batches):
+            start = b * grid_batch_size
+            stop = (b + 1) * grid_batch_size
+            dists = cdists(pos[start:stop], grid)  # pairwise distances
+            # map distances to bins (of distance distribution from the network output)
+            bins = model.dists_to_classes(dists, in_place=True)
+            del dists
+            # lookup of log probabilities of these distances in the network output
+            log_p_atom = torch.gather(prediction[start:stop], dim=1, index=bins)
+            del bins
+            # multiply probabilities of all neighbors at candidate positions (add log_p)
+            log_p_mol += scatter_add(
+                log_p_atom, idx_m_local[start:stop], dim_size=len(mol_order), dim=0
+            )
+            del log_p_atom
         # normalize probabilities and use temperature parameter t
         # first normalizing, applying t and re-normalizing is equivalent to directly
         # applying t and normalizing thereafter but it is numerically more stable
@@ -307,6 +324,8 @@ def generate_molecules(
         nbh_prediction[:, i, 2:][in_pred_m, in_pred_j] = True  # update rows
         nbh_prediction[:, :, _i][in_pred_m, in_pred_j] = True  # update columns
 
+    # center positions on origin
+    R = R - R[:, 1:2]
     return R, Z, finished_list
 
 

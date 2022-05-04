@@ -1,8 +1,7 @@
 import logging
-import os
 import uuid
 import tempfile
-from typing import List, Tuple
+import shutil
 
 import torch
 import hydra
@@ -17,7 +16,7 @@ from ase import Atoms
 from tqdm import tqdm
 
 from schnetpack.utils.script import print_config
-from gschnet.generate_molecules import generate_molecules
+from src.generate_molecules import generate_molecules
 
 log = logging.getLogger(__name__)
 
@@ -25,7 +24,7 @@ OmegaConf.register_new_resolver("uuid", lambda x: str(uuid.uuid1()))
 OmegaConf.register_new_resolver("tmpdir", tempfile.mkdtemp, use_cache=True)
 
 
-@hydra.main(config_path="../../configs", config_name="generate_molecules")
+@hydra.main(config_path="configs", config_name="generate_molecules")
 def generate(config: DictConfig):
 
     # create output file where the generated molecules will be written to
@@ -42,19 +41,24 @@ def generate(config: DictConfig):
         outputfile.parent.mkdir(parents=True, exist_ok=True)
         outputfile.touch(exist_ok=False)
 
-    with connect(outputfile) as con:
-        if con.count() > 0:
-            log.info(
-                f"Caution, the data base {outputfile.resolve()} already exists and "
-                f"contains {con.count()} molecules. Generated molecules will be "
-                f"appended to the data base."
-            )
-
     # print config
     if config.get("print_config"):
         print_config(
             config, resolve=False, fields=("modeldir", "generate", "conditions")
         )
+
+    with connect(outputfile) as con:
+        n_existing_mols = con.count()
+        if n_existing_mols > 0:
+            log.info(
+                f"Caution, the data base {outputfile.resolve()} already exists and "
+                f"contains {n_existing_mols} molecules. Generated molecules will be "
+                f"appended to the data base."
+            )
+
+    original_outputfile = outputfile
+    if config.workdir is not None:
+        outputfile = shutil.copy(original_outputfile, Path(config.workdir))
 
     # choose device (gpu or cpu)
     if config.use_gpu:
@@ -66,6 +70,7 @@ def generate(config: DictConfig):
     model = torch.load("best_inference_model", map_location=device)
 
     # parse composition (if it is included in conditions)
+    original_conditions = OmegaConf.to_container(config.conditions)
     config.conditions = parse_composition(
         config.conditions, model.get_available_atom_types().cpu().numpy()
     )
@@ -75,34 +80,61 @@ def generate(config: DictConfig):
 
     # generate molecules in batches
     log.info(
-        f"Generating {config.generate.n_molecules} molecules in {n_batches} batches!"
+        f"Generating {config.generate.n_molecules} molecules in {n_batches} batches! "
+        f'Running on device "{device}".'
     )
-    log.info(f"Writing generated molecules to {outputfile.resolve()} after each batch.")
     ats = []
-    for i in tqdm(range(n_batches)):
-        # generate
-        remaining = config.generate.n_molecules - i * config.generate.batch_size
-        R, Z, finished_list = generate_molecules(
-            model=model,
-            n_molecules=min(config.generate.batch_size, remaining),
-            max_n_atoms=config.generate.max_n_atoms,
-            grid_distance_min=config.generate.grid_distance_min,
-            grid_spacing=config.generate.grid_spacing,
-            conditions=config.conditions,
-            device=device,
-            t=config.generate.temperature_term,
-        )
-
-        # store generated molecules in db
-        R = R.cpu().numpy()
-        Z = Z.cpu().numpy()
-        with connect(outputfile) as con:
-            for idx, n_atoms in finished_list:
-                at = Atoms(
-                    numbers=Z[idx, 2 : n_atoms + 2], positions=R[idx, 2 : n_atoms + 2]
+    with connect(outputfile) as con:
+        for i in tqdm(range(n_batches)):
+            # generate
+            remaining = config.generate.n_molecules - i * config.generate.batch_size
+            with torch.no_grad():
+                R, Z, finished_list = generate_molecules(
+                    model=model,
+                    n_molecules=min(config.generate.batch_size, remaining),
+                    max_n_atoms=config.generate.max_n_atoms,
+                    grid_distance_min=config.generate.grid_distance_min,
+                    grid_spacing=config.generate.grid_spacing,
+                    conditions=config.conditions,
+                    device=device,
+                    t=config.generate.temperature_term,
+                    grid_batch_size=config.generate.grid_batch_size,
                 )
-                ats += [at]
-                con.write(at)
+
+                # store generated molecules in db
+                R = R.cpu().numpy()
+                Z = Z.cpu().numpy()
+                for idx, n_atoms in finished_list:
+                    at = Atoms(
+                        numbers=Z[idx, 2 : n_atoms + 2],
+                        positions=R[idx, 2 : n_atoms + 2],
+                    )
+                    ats += [at]
+                    con.write(at)
+
+        # update metadata of the data base
+        n_new_mols = con.count() - n_existing_mols
+        key = f"{n_existing_mols}-{n_existing_mols + n_new_mols - 1}"
+        md = con.metadata
+        md.update(
+            {
+                key: {
+                    "conditions": original_conditions,
+                    "atom_types": model.get_available_atom_types()
+                    .cpu()
+                    .numpy()
+                    .tolist(),
+                }
+            }
+        )
+        con.metadata = md
+    if config.workdir is not None:
+        shutil.copy(outputfile, original_outputfile)
+
+    log.info(
+        f"Finished generation. Wrote {n_new_mols} successfully generated molecules to "
+        f"the data base at {original_outputfile.resolve()}!"
+    )
 
     # visualize molecules if desired
     if config.view_molecules:
@@ -176,5 +208,9 @@ def parse_composition(conditions, available_atom_types):
                 composition_str += f"{atom_name}{composition_dict[atom_name]}"
             else:
                 H_str += f"{atom_name}{composition_dict[atom_name]}"
-    conditions.trajectory.composition = composition_list
+    conditions.trajectory.composition = ListConfig(composition_list)
     return conditions
+
+
+if __name__ == "__main__":
+    generate()

@@ -3,18 +3,20 @@ defaults:
   - conditions: no_conditions
 
 modeldir: ???
-outputfile: generated_molecules.db
+workdir: ${tmpdir:_generated_molecules}
+outputfile: generated_molecules_${oc.env:JOB_ID,0}_${oc.env:TASK_ID,0}.db
 generate:
-  n_molecules: 35
+  n_molecules: 100
   batch_size: 10
   max_n_atoms: 35
   grid_distance_min: 0.7
   grid_spacing: 0.05
   temperature_term: 0.1
+  grid_batch_size: -1
 
-use_gpu: False
+use_gpu: True
 print_config: True
-view_molecules: True
+view_molecules: False
 
 # hydra configuration
 hydra:

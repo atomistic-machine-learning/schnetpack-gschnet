@@ -3,7 +3,7 @@ from typing import Callable, Dict
 import torch
 from torch import nn
 
-import gschnet.properties as properties
+from src import properties
 from schnetpack.nn import Dense, scatter_add
 from schnetpack.nn.activations import shifted_softplus
 

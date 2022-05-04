@@ -1,5 +1,5 @@
 import torch
-import gschnet.properties as properties
+from src import properties
 
 __all__ = ["gschnet_collate_fn"]
 

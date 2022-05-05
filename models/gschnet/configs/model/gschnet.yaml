@@ -20,3 +20,5 @@ stop_type: ${globals.stop_type}
 model_cutoff: ${globals.model_cutoff}
 prediction_cutoff: ${globals.prediction_cutoff}
 placement_cutoff: ${globals.placement_cutoff}
+type_prediction_n_hidden: [206, 156, 106, 56]
+distance_prediction_n_hidden: [264, 273, 282, 291]

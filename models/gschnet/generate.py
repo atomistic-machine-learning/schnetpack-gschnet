@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import logging
 import uuid
 import tempfile
@@ -16,7 +17,7 @@ from ase import Atoms
 from tqdm import tqdm
 
 from schnetpack.utils.script import print_config
-from src.generate_molecules import generate_molecules
+from gschnet.generate_molecules import generate_molecules
 
 log = logging.getLogger(__name__)
 

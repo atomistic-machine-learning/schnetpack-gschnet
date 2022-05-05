@@ -2,7 +2,7 @@ from typing import Dict, Optional, List, Tuple
 import logging
 import torch
 from schnetpack.transform.base import Transform
-from src import properties
+from gschnet import properties
 
 logger = logging.getLogger(__name__)
 

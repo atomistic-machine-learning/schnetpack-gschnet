@@ -14,8 +14,8 @@ from ase.io.extxyz import read_xyz
 from tqdm import tqdm
 
 import torch
-from src.data import GenerativeAtomsDataModule
-from src import properties
+from gschnet.data import GenerativeAtomsDataModule
+from gschnet import properties
 from schnetpack.data import (
     AtomsDataFormat,
     BaseAtomsData,
@@ -24,7 +24,9 @@ from schnetpack.data import (
     AtomsDataModuleError,
 )
 
-__all__ = ["QM9Gen"]
+__all__ = [
+    "QM9Gen",
+]
 
 
 class QM9Gen(GenerativeAtomsDataModule):

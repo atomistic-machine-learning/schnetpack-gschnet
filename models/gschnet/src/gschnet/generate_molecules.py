@@ -1,6 +1,6 @@
 import torch
 import math
-from src import properties
+from gschnet import properties
 from schnetpack.nn.scatter import scatter_add
 from torch.functional import F
 
@@ -20,8 +20,6 @@ def generate_molecules(
 ):
     # ================================ initialization ================================
 
-    if not hasattr(model, "legacy_type_normalization"):
-        model.legacy_type_normalization = True
     # check if all conditions required by the model are provided
     condition_names = model.get_condition_names()
     for condition_type in condition_names:
@@ -355,22 +353,3 @@ def cdists(pos_1, pos_2):
     return F.relu(
         torch.sum((pos_1[:, None] - pos_2[None]).pow_(2), -1), inplace=True
     ).sqrt_()
-
-
-if __name__ == "__main__":
-    with torch.no_grad():
-        generate_molecules(
-            "/home/niklas/phd/experiments/spk_runs/models/qm9_comp_relenergy/"
-            "old_type_distribution_cv_radii/best_inference_model",
-            100,
-            35,
-            0.7,
-            0.05,
-            {
-                "trajectory": {
-                    "relative_atomic_energy": 0.1,
-                    "composition": [10, 7, 0, 2, 0],
-                }
-            },
-            "/home/niklas/mols.db",
-        )

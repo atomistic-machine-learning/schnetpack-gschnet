@@ -5,12 +5,12 @@ from typing import Dict, Optional, List, Callable
 from schnetpack.transform import Transform
 from schnetpack.model import AtomisticModel
 from schnetpack.nn.activations import shifted_softplus
-from src.schnet import SchNet
+from gschnet.schnet import SchNet
 from schnetpack.nn import build_mlp
 from schnetpack.nn.scatter import scatter_add
 from schnetpack.nn.radial import GaussianRBF
 
-from src import properties
+from gschnet import properties
 import math
 import torch
 import torch.nn as nn

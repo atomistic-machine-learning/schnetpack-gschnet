@@ -12,7 +12,7 @@ from ase.neighborlist import neighbor_list
 from ase.data import covalent_radii
 from schnetpack.transform.base import Transform
 import fasteners
-from src import properties
+from gschnet import properties
 
 logger = logging.getLogger(__name__)
 

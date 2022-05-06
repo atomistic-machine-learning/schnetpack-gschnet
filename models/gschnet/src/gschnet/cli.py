@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 import logging
 import uuid
 import tempfile
@@ -211,7 +210,3 @@ def parse_composition(conditions, available_atom_types):
                 H_str += f"{atom_name}{composition_dict[atom_name]}"
     conditions.trajectory.composition = ListConfig(composition_list)
     return conditions
-
-
-if __name__ == "__main__":
-    generate()

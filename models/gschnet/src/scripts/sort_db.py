@@ -98,9 +98,6 @@ def sort_db(args):
                     )
                     target.write(at)
                     pbar.update()
-                if args.write_mol_dict:
-                    sorted_gathered_mols[key]["_positions"] = positions.tolist()
-                    sorted_gathered_mols[key]["_atomic_numbers"] = numbers.tolist()
     log.info("... done!")
 
     if args.write_mol_dict:

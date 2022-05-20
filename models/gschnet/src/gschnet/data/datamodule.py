@@ -381,7 +381,7 @@ class GenerativeAtomsDataModule(AtomsDataModule):
         else:
             logging.info(
                 f"Filtering structures to excluded molecules from training and "
-                f"validation split according to the filter: "
+                f"validation splits according to the filter: "
                 f"{self.train_filter}."
             )
             # initialize transforms (leads to errors if train/val/test split required)

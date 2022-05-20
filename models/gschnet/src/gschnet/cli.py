@@ -44,7 +44,9 @@ def generate(config: DictConfig):
     # print config
     if config.get("print_config"):
         print_config(
-            config, resolve=False, fields=("modeldir", "generate", "conditions")
+            config,
+            resolve=False,
+            fields=("modeldir", "workdir", "generate", "conditions"),
         )
 
     with connect(outputfile) as con:

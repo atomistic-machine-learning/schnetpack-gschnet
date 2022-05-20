@@ -1,0 +1,25 @@
+_target_: gschnet.ConditioningModule
+n_features: 128
+n_layers: 5
+condition_embeddings:
+  - _target_: gschnet.ScalarConditionEmbedding
+    condition_name: gap
+    condition_type: trajectory
+    condition_min: 2
+    condition_max: 11
+    grid_spacing: 2.25
+    n_features: 64
+    n_layers: 3
+    required_data_properties:
+      - gap
+  - _target_: gschnet.ScalarConditionEmbedding
+    condition_name: relative_atomic_energy
+    condition_type: trajectory
+    condition_min: -0.2
+    condition_max: 0.2
+    grid_spacing: 0.1
+    n_features: 64
+    n_layers: 3
+    required_data_properties:
+      - energy_U0
+

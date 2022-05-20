@@ -5,7 +5,7 @@ defaults:
   - override /data: gschnet_qm9
   - override /task: gschnet_task
   - override /model: gschnet
-  - override /model/conditioning: null
+  - override /model/conditioning: gap_relenergy
 
 run:
   path: models/qm9_${globals.name}
@@ -23,7 +23,7 @@ globals:
   stop_type: 4
   lr: 1e-4
   draw_random_samples: 0
-  name: no_conditions
+  name: gap_relenergy
   id: ${oc.env:JOB_ID,${uuid:1}}_${oc.env:HOSTNAME,""}
   temp_dir: ${tmpdir:_qm9}
 
@@ -43,6 +43,10 @@ data:
   transforms:
     - _target_: schnetpack.transform.SubtractCenterOfMass
     - _target_: gschnet.transform.OrderByDistanceToOrigin
+    - _target_: gschnet.transform.GetRelativeAtomicEnergy
+      atom_types: ${globals.atom_types}
+      target_energy_name: energy_U0
+      max_train_points: 5000
     - _target_: gschnet.transform.GeneralCachedNeighborList
       cache_path: ${run.work_dir}/cache
       keep_cache: False
@@ -63,4 +67,3 @@ data:
       draw_random_samples: ${globals.draw_random_samples}
       sort_idx_i: False
     - _target_: schnetpack.transform.CastTo32
-

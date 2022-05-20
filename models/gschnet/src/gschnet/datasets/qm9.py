@@ -79,6 +79,8 @@ class QM9Gen(GenerativeAtomsDataModule):
         train_transforms: Optional[List[torch.nn.Module]] = None,
         val_transforms: Optional[List[torch.nn.Module]] = None,
         test_transforms: Optional[List[torch.nn.Module]] = None,
+        train_filter_transforms: Optional[List[torch.nn.Module]] = None,
+        train_filter: Optional[List[Dict]] = None,
         num_workers: int = 4,
         num_val_workers: Optional[int] = None,
         num_test_workers: Optional[int] = None,
@@ -118,6 +120,14 @@ class QM9Gen(GenerativeAtomsDataModule):
             train_transforms: Overrides transform_fn for training.
             val_transforms: Overrides transform_fn for validation.
             test_transforms: Overrides transform_fn for testing.
+            train_filter_transforms: Preprocessing transform applied to each system
+                before the train_filter is applied (e.g. to extract the composition)
+            train_filter: List of filters used to exclude certain structures from the
+                training and validation splits (e.g. certain compositions or molecules
+                with specific property values). The excluded structures are included in
+                the test split. Each molecule that matches at least one of the filters
+                in the list is excluded (i.e. we take the union of the result of each
+                individual filter to obtain the set of excluded structures).
             num_workers: Number of data loader workers.
             num_val_workers: Number of validation data loader workers (overrides
                 num_workers).
@@ -148,6 +158,8 @@ class QM9Gen(GenerativeAtomsDataModule):
             train_transforms=train_transforms,
             val_transforms=val_transforms,
             test_transforms=test_transforms,
+            train_filter_transforms=train_filter_transforms,
+            train_filter=train_filter,
             num_workers=num_workers,
             num_val_workers=num_val_workers,
             num_test_workers=num_test_workers,

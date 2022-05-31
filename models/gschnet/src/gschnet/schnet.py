@@ -9,7 +9,7 @@ from schnetpack.nn.activations import shifted_softplus
 
 import schnetpack.nn as snn
 
-__all__ = ["SchNet", "SchNetInteraction"]
+__all__ = ["SchNet", "SchNetInteraction", "HardCutoff"]
 
 
 class SchNetInteraction(nn.Module):
@@ -158,3 +158,16 @@ class SchNet(nn.Module):
 
         inputs["scalar_representation"] = x
         return inputs
+
+
+def hard_cutoff(dists):
+    return torch.ones_like(dists)
+
+
+class HardCutoff(nn.Module):
+    def __init__(self, cutoff: float):
+        super(HardCutoff, self).__init__()
+        self.register_buffer("cutoff", torch.FloatTensor([cutoff]))
+
+    def forward(self, input: torch.Tensor):
+        return hard_cutoff(input)

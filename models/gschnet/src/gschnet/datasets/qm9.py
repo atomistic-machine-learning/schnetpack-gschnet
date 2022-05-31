@@ -298,7 +298,7 @@ class QM9Gen(GenerativeAtomsDataModule):
             props[properties.R] = ats.positions
             props[properties.cell] = ats.cell
             props[properties.pbc] = ats.pbc
-            property_list.append(properties)
+            property_list.append(props)
 
         logging.info(f"Write atoms to db at {self.datapath}...")
         dataset.add_systems(property_list=property_list)

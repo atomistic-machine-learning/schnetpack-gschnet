@@ -25,7 +25,8 @@ globals:
   draw_random_samples: 0
   name: comp_relenergy
   id: ${oc.env:JOB_ID,${uuid:1}}_${oc.env:HOSTNAME,""}
-  temp_dir: ${tmpdir:_qm9}
+  data_workdir: ${tmpdir:_qm9}/data
+  cache_workdir: ${tmpdir:_qm9}/cache
 
 trainer:
   progress_bar_refresh_rate: 25000
@@ -39,7 +40,7 @@ data:
   batch_size: 5
   num_train: 50000
   num_val: 5000
-  data_workdir: ${globals.temp_dir}/data
+  data_workdir: ${globals.data_workdir}
   train_filter:
     - property: composition
       operator: ==
@@ -59,7 +60,7 @@ data:
     - _target_: gschnet.transform.GeneralCachedNeighborList
       cache_path: ${run.work_dir}/cache
       keep_cache: False
-      cache_workdir: ${globals.temp_dir}/cache
+      cache_workdir: ${globals.cache_workdir}
       neighbor_list:
         _target_: gschnet.transform.ConditionalGSchNetNeighborList
         model_cutoff: ${globals.model_cutoff}

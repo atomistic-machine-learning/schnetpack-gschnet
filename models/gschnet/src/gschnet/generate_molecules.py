@@ -18,6 +18,58 @@ def generate_molecules(
     t: float = 0.1,
     grid_batch_size: float = -1,
 ):
+    """
+    Generate a batch of molecules.
+
+    Args:
+        model: The model used to predict atom types and pairwise distances at each step.
+        n_molecules: The number of molecules that shall be generated.
+        max_n_atoms: The maximum number of atoms in generated molecules.
+        grid_distance_min: The minimum distance covered by the 3d grid when placing
+            atoms.
+        grid_spacing: The spacing of bins of the 3d grid in one dimension (e.g. a
+            spacing of 0.05 means each bin is a cube where each side has a length of
+            0.05).
+        conditions: The target property values used as conditions for the generated
+            molecules. These need to be given in a nested dictionary, where the highest
+            level signifies the type of the condition (i.e. `trajectory`, `step`, or
+            `atom`) and each nested dictionary contains key-value-pairs where the key
+            is the name of the property and the value is the target value.
+            For example, in order to condition the generation on a gap value of 4.0
+            and relative atomic energy of -0.1, one would provide
+            `{'trajectory': {'gap': 4.0, 'relative_atomic_energy': -0.1}}`. Each
+            condition the model was trained on needs to be specified, otherwise a
+            ValueError is raised.
+        device: The device used by pytorch (e.g. `cuda` or `cpu`).
+        t: The temperature term that controls the spread of probability mass on the 3d
+            grid. Higher values lead to increased randomness, whereas smaller values
+            decrease randomness (by making the distribution flatter or more peaky,
+            respectively).
+        grid_batch_size: Determines for how many already placed atoms the 3d grid
+            probability is computed at the same time. Set to -1 to compute for all atoms
+            at once.
+            Since the computation of many 3d grids at once requires a lot of memory,
+            it is a bottleneck to the total number of molecules that can be generated
+            in one batch (i.e. n_molecules). By setting grid_batch_size (e.g. to the
+            same value as n_molecules), it is possible to use larger values of
+            n_molecules, as the memory requirement for computation of the 3d grid and
+            of the model forward pass is aligned.
+
+    Returns:
+        Tuple[torch.Tensor, torch.Tensor, List[Tuple[int, int]]]:
+            1. The positions of atoms as a batch (n_molecules x max_n_atoms x 3).
+            2. The types of atoms as a batch (n_molecules x max_n_atoms).
+            3. A list with tuples where each tuple contains the index of a finished
+            molecule and its length (i.e. number of atoms in that molecule). This means
+            that one can use positions[tuple[0], :tuple[1]] to get the positions of a
+            finished molecule (and proceed accordingly with the types).
+            Caution: The list can be shorter than n_molecules, as it only contains
+            tuples for molecules that where marked as finished by the model. Molecules
+            where the generation was not finished after placing max_n_atoms are not
+            contained in this list. Accordingly, rows in the returned positions and
+            types that are not referenced in the list are the results of an
+            unfinished/failed generation attempt.
+    """
     # ================================ initialization ================================
 
     # check if all conditions required by the model are provided

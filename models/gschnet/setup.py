@@ -31,7 +31,7 @@ setup(
         "schnetpack>=1.0.0.dev0",
         "torch>=1.9",
         "pytorch_lightning>=1.3.5",
-        "hydra-core>=1.1.0",
+        "hydra-core==1.1.0",
         "hydra-colorlog>=1.1.0",
         "numpy",
         "ase>=3.21",

@@ -4,6 +4,11 @@ defaults:
   - _self_
   - override /data: gschnet_qm9
   - override /task: gschnet_task
+  - override /callbacks:
+      - checkpoint
+      - earlystopping
+      - lrmonitor
+      - progressbar
   - override /model: gschnet
   - override /model/conditioning: comp_relenergy
 
@@ -28,13 +33,11 @@ globals:
   data_workdir: ${tmpdir:_qm9}/data
   cache_workdir: ${tmpdir:_qm9}/cache
 
-trainer:
-  progress_bar_refresh_rate: 25000
-  amp_level: null
-
 callbacks:
   early_stopping:
     patience: 25
+  progress_bar:
+    refresh_rate: 100
 
 data:
   batch_size: 5

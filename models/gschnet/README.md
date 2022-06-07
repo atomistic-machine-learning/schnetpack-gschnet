@@ -4,11 +4,19 @@ Here we provide a re-implementation of [cG-SchNet](https://www.nature.com/articl
 Compared to previous versions, SchNetPack changed from batching molecules to batching atoms, effectively removing the need for padding individual systems.
 G-SchNet greatly benefits from this change in terms of memory requirements, allowing to train models of the same expressivity on GPUs with less VRAM.
 
-Furthermore, we changed a few details in this implementation concerning the model as well as the data pre-processing. For reproduction of the reported results, please refer to the specific repositories where we provide the code used in each publication:
+Furthermore, we changed a few details in this implementation concerning the model as well as the data pre-processing in order to improve scalability and simplify adaptations to custom data sets. For reproduction of the reported results, please refer to the specific repositories where we provide the code used in each publication:
 -  [G-SchNet](https://github.com/atomistic-machine-learning/G-SchNet) ([Symmetry-adapted generation of 3d point sets for the targeted discovery of molecules, 2019](http://papers.nips.cc/paper/8974-symmetry-adapted-generation-of-3d-point-sets-for-the-targeted-discovery-of-molecules))
 - [cG-SchNet](https://github.com/atomistic-machine-learning/cG-SchNet) ([Inverse design of 3d molecular structures with conditional generative neural networks, 2022](https://www.nature.com/articles/s41467-022-28526-y))
 
 _**Disclaimer**: The switch to the new SchNetPack version required us to rewrite almost the entire code base. Although the training is working and trained models successfully sample from learned, conditional distributions, we are still thoroughly investigating the code and running experiments to verify the implementation. If you encounter bugs or unexpected behaviour, please file an issue. Accordingly, we expect that we might have some breaking updates/changes in the near future. We aim for a first stable release with the release of SchNetPack 2.0._
+
+### Changes in this implementation
+
+The conceptual changes we made mainly concern the preparation of data and the reconstruction of the 3d positional distribution.
+-   When sampling trajectories of atom placement steps for training, instead of using the molecular graph to determine the available neighbors of a focus atom we now employ a fixed radial cutoff called _placement cutoff_. All atoms within the placement cutoff are considered to be neighbors of the focus. Optionally, we allow to use covalent radii in this process. In that case, we check whether the covalent radii of the focus atom and atoms within the placement cutoff are overlapping to determine neighbors. 
+-   When reconstructing the 3d positional distribution, we now only use distance predictions of atoms within a fixed, radial _prediction cutoff_ around the focus atom instead of using all previously placed atoms. This means that the number of distance distributions predicted by the model in each step is bound and can be controlled with the prediction cutoff, which improves the scaling of G-SchNet when applying it to larger molecules.
+
+Accordingly, in comparison to previous implementations where G-SchNet had only a single _model cutoff_ that determined which atoms are exchanging messages in the SchNet interaction blocks, this version has three cutoffs as hyper-parameters, namely the model cutoff, the prediction cutoff, and the placement cutoff.
 
 ### Citation
 

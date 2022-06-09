@@ -49,43 +49,43 @@ N. Gebauer, M. Gastegger, and K. Schütt. _Symmetry-adapted generation of 3d poi
         url = {http://papers.nips.cc/paper/8974-symmetry-adapted-generation-of-3d-point-sets-for-the-targeted-discovery-of-molecules.pdf}
     }
 
+
+# Getting started
+
 ### Installation
 
-Please clone the schnetpack.modelzoo repository as well as the newest SchNetPack version from the dev branch ([find it here](https://github.com/atomistic-machine-learning/schnetpack/tree/dev)).
+Please clone this repository as well as the newest SchNetPack version from the dev branch ([find it here](https://github.com/atomistic-machine-learning/schnetpack/tree/dev)). In the following, please replace `<schnetpack/path>` and `<schnetpack-gschnet/path>` with the correct paths to the cloned repositories on your system.
 You can set up a fresh conda environment called `gschnet` and install G-SchNet as well as all requirements as follows (tested on Ubuntu 20.04):
 
 ```
 conda create -n gschnet python=3.9 numpy
 conda activate gschnet
-pip install <insert/path/to/schnetpack>
-pip install <insert/path/to/schnetpack.modelzoo>/models/gschnet
+pip install <schnetpack/path>
+pip install <schnetpack-gschnet/path>
 ```
-
-
-# Getting started
 
 ### Training
 
 The following code will start training a G-SchNet model without conditions in the current working directory:
 
 ```
-python <insert/path/to/schnetpack.modelzoo>/models/gschnet/src/scripts/train.py --config_dir=<insert/path/to/schnetpack.modelzoo>/models/gschnet/src/gschnet/configs experiment=gschnet_qm9
+python <schnetpack-gschnet/path>/src/scripts/train.py --config_dir=<schnetpack-gschnet/path>/src/gschnet/configs experiment=gschnet_qm9
 ```
 
-We use hierarchical Hydra config files for training. The config parameters can also be adjusted in the command line. For example, you can train a cG-SchNet model that is conditioned on the HOMO-LUMO gap and relative atomic energy of molecules with `experiment=gschnet_qm9_gap_relenergy`. For more customized setups, you can copy the configs folder and add new configs or adapt existing ones and then change `config_dir=<insert/path/to/your/configs>`.
+We use hierarchical Hydra config files for training. The config parameters can also be adjusted in the command line. For example, you can train a cG-SchNet model that is conditioned on the HOMO-LUMO gap and relative atomic energy of molecules with `experiment=gschnet_qm9_gap_relenergy`. For more customized setups, you can copy the configs folder and add new configs or adapt existing ones and then change `config_dir=<path to your configs>`.
 
 ### Generation
 
 After training an unconditioned model, you can generate 10 molecules as follows:
 
 ```
-python <insert/path/to/schnetpack.modelzoo>/models/gschnet/src/scripts/generate.py --config_dir=<insert/path/to/schnetpack.modelzoo>/models/gschnet/src/gschnet/configs model_dir=<insert/path/to/trained/model> generate.n_molecules=10
+python <schnetpack-gschnet/path>/src/scripts/generate.py --config_dir=<schnetpack-gschnet/path>/src/gschnet/configs model_dir=<path to trained model> generate.n_molecules=10
 ```
 
-For conditioned models, target values for all conditional properties need to be specified for generation (for example, see configs in `/models/gschnet/src/gschnet/configs/conditions`), e.g. for a model conditioned on HOMO-LUMO gap and relative atomic energy:
+For conditioned models, target values for all conditional properties need to be specified for generation (for example, see configs in `<schnetpack-gschnet/path>/src/gschnet/configs/conditions`), e.g. for a model conditioned on HOMO-LUMO gap and relative atomic energy:
 
 ```
-python <insert/path/to/schnetpack.modelzoo>/models/gschnet/src/scripts/generate.py --config_dir=<insert/path/to/schnetpack.modelzoo>/models/gschnet/src/gschnet/configs model_dir=<insert/path/to/trained/model> conditions=gap_relenergy generate.n_molecules=10
+python <schnetpack-gschnet/path>/src/scripts/generate.py --config_dir=<schnetpack-gschnet/path>/src/gschnet/configs model_dir=<path to trained model> conditions=gap_relenergy generate.n_molecules=10
 ```
 
-The available parameters (e.g. batch size, maximum number of atoms etc.) can be found in `configs/generate.yaml`.
+The available parameters (e.g. batch size, maximum number of atoms etc.) can be found in `<schnetpack-gschnet/path>/src/gschnet/configs/generate.yaml`.

@@ -20,4 +20,4 @@ jobs:
     - uses: psf/black@stable
       with:
           options: "-v -l 88 --check --diff"
-          src: "./models"
+          src: "."

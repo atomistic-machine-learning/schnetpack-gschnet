@@ -42,13 +42,13 @@ hydra:
         == Config ==
         This is the config generated for this run.
         You can change the config file to be loaded to a predefined one
-        > gschnet_generate --config-name=train_qm9
+        > generate.py --config-name=generate_molecules
 
         or your own:
-        > gschnet_generate --config-dir=./my_configs --config-name=my_config
+        > generate.py --config-dir=./my_configs --config-name=my_config
 
         You can override everything, for example:
-        > gschnet_generate --config-name=train_qm9 data_dir=/path/to/datadir data.batch_size=50 --help
+        > generate.py --config-name=generate_molecules outputfile=/path/to/out.db generate.batch_size=50 --help
 
         -------
         $CONFIG

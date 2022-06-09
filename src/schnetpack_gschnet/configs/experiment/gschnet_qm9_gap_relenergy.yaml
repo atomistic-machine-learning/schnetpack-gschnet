@@ -10,7 +10,7 @@ defaults:
       - lrmonitor
       - progressbar
   - override /model: gschnet
-  - override /model/conditioning: comp_relenergy
+  - override /model/conditioning: gap_relenergy
 
 run:
   path: models/qm9_${globals.name}
@@ -28,7 +28,7 @@ globals:
   stop_type: 4
   lr: 1e-4
   draw_random_samples: 0
-  name: comp_relenergy
+  name: gap_relenergy
   id: ${oc.env:JOB_ID,${uuid:1}}_${oc.env:HOSTNAME,""}
   data_workdir: ${tmpdir:_qm9}/data
   cache_workdir: ${tmpdir:_qm9}/cache
@@ -44,35 +44,26 @@ data:
   num_train: 50000
   num_val: 5000
   data_workdir: ${globals.data_workdir}
-  train_filter:
-    - property: composition
-      operator: ==
-      value: [10, 7, 0, 2, 0]
-  train_filter_transforms:
-    - _target_: gschnet.transform.GetComposition
-      atom_types: ${globals.atom_types}
   transforms:
     - _target_: schnetpack.transform.SubtractCenterOfMass
-    - _target_: gschnet.transform.OrderByDistanceToOrigin
-    - _target_: gschnet.transform.GetComposition
-      atom_types: ${globals.atom_types}
-    - _target_: gschnet.transform.GetRelativeAtomicEnergy
+    - _target_: schnetpack_gschnet.transform.OrderByDistanceToOrigin
+    - _target_: schnetpack_gschnet.transform.GetRelativeAtomicEnergy
       atom_types: ${globals.atom_types}
       target_energy_name: energy_U0
       max_train_points: 5000
-    - _target_: gschnet.transform.GeneralCachedNeighborList
+    - _target_: schnetpack_gschnet.transform.GeneralCachedNeighborList
       cache_path: ${run.work_dir}/cache
       keep_cache: False
       cache_workdir: ${globals.cache_workdir}
       neighbor_list:
-        _target_: gschnet.transform.ConditionalGSchNetNeighborList
+        _target_: schnetpack_gschnet.transform.ConditionalGSchNetNeighborList
         model_cutoff: ${globals.model_cutoff}
         prediction_cutoff: ${globals.prediction_cutoff}
         placement_cutoff: ${globals.placement_cutoff}
         environment_provider: ase
         use_covalent_radii: ${globals.use_covalent_radii}
         covalent_radius_factor: ${globals.covalent_radius_factor}
-    - _target_: gschnet.transform.BuildAtomsTrajectory
+    - _target_: schnetpack_gschnet.transform.BuildAtomsTrajectory
       centered: True
       origin_type: ${globals.origin_type}
       focus_type: ${globals.focus_type}

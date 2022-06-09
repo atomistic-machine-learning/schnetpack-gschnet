@@ -1,6 +1,6 @@
 import torch
 import math
-from gschnet import properties
+from schnetpack_gschnet import properties
 from schnetpack.nn.scatter import scatter_add
 from torch.functional import F
 

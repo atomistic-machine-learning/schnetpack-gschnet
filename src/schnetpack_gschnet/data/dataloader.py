@@ -1,5 +1,5 @@
 import torch
-from gschnet import properties
+from schnetpack_gschnet import properties
 
 __all__ = ["gschnet_collate_fn"]
 

@@ -16,7 +16,7 @@ from ase import Atoms
 from tqdm import tqdm
 
 from schnetpack.utils.script import print_config
-from gschnet.generate_molecules import generate_molecules
+from schnetpack_gschnet.generate_molecules import generate_molecules
 
 log = logging.getLogger(__name__)
 

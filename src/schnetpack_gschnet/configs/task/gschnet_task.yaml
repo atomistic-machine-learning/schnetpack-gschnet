@@ -2,7 +2,7 @@ defaults:
   - optimizer: adam
   - scheduler: reduce_on_plateau
 
-_target_: gschnet.ConditionalGenerativeSchNetTask
+_target_: schnetpack_gschnet.ConditionalGenerativeSchNetTask
 scheduler_args:
   mode: min
   factor: 0.5

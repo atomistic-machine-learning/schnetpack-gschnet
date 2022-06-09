@@ -1,7 +1,7 @@
 defaults:
   - custom
 
-_target_: gschnet.datasets.QM9Gen
+_target_: schnetpack_gschnet.datasets.QM9Gen
 
 placement_cutoff: ${globals.placement_cutoff}
 use_covalent_radii: ${globals.use_covalent_radii}

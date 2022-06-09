@@ -20,7 +20,7 @@ def read(
 
 
 setup(
-    name="gschnet",
+    name="schnetpack-gschnet",
     packages=find_packages("src"),
     package_dir={"": "src"},
     version="0.1",

@@ -46,20 +46,20 @@ data:
   data_workdir: ${globals.data_workdir}
   transforms:
     - _target_: schnetpack.transform.SubtractCenterOfMass
-    - _target_: gschnet.transform.OrderByDistanceToOrigin
-    - _target_: gschnet.transform.GeneralCachedNeighborList
+    - _target_: schnetpack_gschnet.transform.OrderByDistanceToOrigin
+    - _target_: schnetpack_gschnet.transform.GeneralCachedNeighborList
       cache_path: ${run.work_dir}/cache
       keep_cache: False
       cache_workdir: ${globals.cache_workdir}
       neighbor_list:
-        _target_: gschnet.transform.ConditionalGSchNetNeighborList
+        _target_: schnetpack_gschnet.transform.ConditionalGSchNetNeighborList
         model_cutoff: ${globals.model_cutoff}
         prediction_cutoff: ${globals.prediction_cutoff}
         placement_cutoff: ${globals.placement_cutoff}
         environment_provider: ase
         use_covalent_radii: ${globals.use_covalent_radii}
         covalent_radius_factor: ${globals.covalent_radius_factor}
-    - _target_: gschnet.transform.BuildAtomsTrajectory
+    - _target_: schnetpack_gschnet.transform.BuildAtomsTrajectory
       centered: True
       origin_type: ${globals.origin_type}
       focus_type: ${globals.focus_type}

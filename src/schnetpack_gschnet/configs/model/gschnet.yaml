@@ -1,9 +1,9 @@
 defaults:
   - conditioning: comp_relenergy
 
-_target_: gschnet.ConditionalGenerativeSchNet
+_target_: schnetpack_gschnet.ConditionalGenerativeSchNet
 representation:
-  _target_: gschnet.SchNet
+  _target_: schnetpack_gschnet.SchNet
   n_atom_basis: 128
   n_interactions: 9
   radial_basis:

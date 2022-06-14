@@ -3,8 +3,10 @@ import math
 from schnetpack_gschnet import properties
 from schnetpack.nn.scatter import scatter_add
 from torch.functional import F
+from ase.visualize import view
+from ase import Atoms
 
-__all__ = ["generate_molecules"]
+__all__ = ["generate_molecules", "generate_molecules_debug"]
 
 
 def generate_molecules(
@@ -405,3 +407,234 @@ def cdists(pos_1, pos_2):
     return F.relu(
         torch.sum((pos_1[:, None] - pos_2[None]).pow_(2), -1), inplace=True
     ).sqrt_()
+
+
+def generate_molecules_debug(
+    model: torch.nn.Module,
+    max_n_atoms: int,
+    grid_distance_min: float,
+    grid_spacing: float,
+    conditions: dict,
+    device: torch.device,
+    t: float = 0.1,
+    print_progress: bool = True,
+    view_progress: bool = True,
+):
+    """
+    This is a simpler implementation of the molecule generation procedure designed for
+    debugging the process. It only samples a single molecule (instead of a batch of
+    molecules) and allows to view the partial molecule at each steps as well as printing
+    some information.
+
+    Args:
+        model: The model used to predict atom types and pairwise distances at each step.
+        max_n_atoms: The maximum number of atoms in generated molecules.
+        grid_distance_min: The minimum distance covered by the 3d grid when placing
+            atoms.
+        grid_spacing: The spacing of bins of the 3d grid in one dimension (e.g. a
+            spacing of 0.05 means each bin is a cube where each side has a length of
+            0.05).
+        conditions: The target property values used as conditions for the generated
+            molecules. These need to be given in a nested dictionary, where the highest
+            level signifies the type of the condition (i.e. `trajectory`, `step`, or
+            `atom`) and each nested dictionary contains key-value-pairs where the key
+            is the name of the property and the value is the target value.
+            For example, in order to condition the generation on a gap value of 4.0
+            and relative atomic energy of -0.1, one would provide
+            `{'trajectory': {'gap': 4.0, 'relative_atomic_energy': -0.1}}`. Each
+            condition the model was trained on needs to be specified, otherwise a
+            ValueError is raised.
+        device: The device used by pytorch (e.g. `cuda` or `cpu`).
+        t: The temperature term that controls the spread of probability mass on the 3d
+            grid. Higher values lead to increased randomness, whereas smaller values
+            decrease randomness (by making the distribution flatter or more peaky,
+            respectively).
+        print_progress: Set True to print focus, type distribution and sampled type
+            at each step
+        view_progress: Set True to display the (partial) molecule at each step
+
+    Returns:
+        Tuple[torch.Tensor, torch.Tensor, List[Tuple[int, int]]]:
+            1. The positions of atoms as a batch (1 x max_n_atoms x 3).
+            2. The types of atoms as a batch (1 x max_n_atoms).
+            3. A list with a tuple that contains the index of the finished molecule (0)
+            and its length (i.e. number of atoms in that molecule). This means
+            that one can use positions[tuple[0], :tuple[1]] to get the positions of the
+            finished molecule (and proceed accordingly with the types).
+            Caution: The list can be empty, as it only contains a tuple if the molecule
+            was marked as finished by the model. Molecules where the generation was not
+            finished after placing max_n_atoms are not contained in this list.
+            Accordingly, rows in the returned positions and types that are not
+            referenced in the list are the results of an unfinished/failed generation
+            attempt.
+    """
+    # check if all conditions required by the model are provided
+    condition_names = model.get_condition_names()
+    for condition_type in condition_names:
+        for condition_name in condition_names[condition_type]:
+            if (
+                conditions[condition_type] is None
+                or condition_name not in conditions[condition_type]
+            ):
+                raise ValueError(
+                    f"The condition `{condition_name}` is required by the model but "
+                    f'not  provided in `conditions["{condition_type}"]`!'
+                )
+
+    n_tokens = 2
+    # initialize tensors for positions and type
+    R = torch.zeros((max_n_atoms + n_tokens, 3)).to(device)
+    Z = torch.zeros(max_n_atoms + n_tokens + 1, dtype=torch.long).to(device)
+    # the first two atoms are the focus and the origin token
+    Z[0] = model.focus_type
+    Z[1] = model.origin_type
+
+    offsets = torch.zeros((max_n_atoms, 3)).to(device)
+    large_distance = max(model.prediction_cutoff, model.model_cutoff) + 1.0
+    ats = []
+    # initialize 3d grid of candidate positions for atom placement
+    grid_3d = get_3d_grid(
+        distance_min=grid_distance_min,
+        distance_max=float(model.placement_cutoff),
+        grid_spacing=grid_spacing,
+    ).to(device)
+    # initialize "1d" grid that only extends into x-direction for the very first step
+    # where we sample the position of the first atom only from the focus and origin
+    grid_1d = torch.zeros((model.n_distance_bins, 3), device=device)
+    grid_1d[:, 0] = torch.linspace(
+        model.distance_min, model.distance_max, model.n_distance_bins
+    )
+
+    # sample new atoms
+    available_atoms = torch.ones(max_n_atoms + n_tokens).to(device)
+    available_atoms[0] = 0  # the focus cannot be chosen as focus
+    for i in range(n_tokens, max_n_atoms + n_tokens + 1):
+        if print_progress:
+            print(
+                f"\nStep {i-n_tokens}:\n"
+                f"------------------------------------------------------------------"
+            )
+
+        # sample atom type
+        sampled_proper_type = False  # set true if type != stop was sampled
+        while not sampled_proper_type:
+            # choose focus randomly
+            focus = torch.multinomial(available_atoms[:i], 1)
+            R[0] = R[focus]
+            # center positions on focus
+            R -= R[0:1].clone()
+            # compute neighborhood
+            all_dists = cdists(R[:i], R[:i])
+            dists = all_dists.clone()
+            # the origin is connected to everything -> set distances to 0
+            dists[1] = 0
+            dists[:, 1] = 0
+            # atoms are not self connected -> set diagonal to large distance
+            dists.fill_diagonal_(large_distance)
+            # extract i,j pairs and corresponding distances
+            idx_i, idx_j = torch.where(dists <= model.model_cutoff)
+            r_ij = all_dists[idx_i, idx_j]
+            # extract which atoms are used for predictions (origin is always used)
+            dists = all_dists.clone()
+            dists[1] = 0
+            dists[:, 1] = 0
+            _, pred_j = torch.where(dists[focus] <= model.prediction_cutoff)
+            pred_m = torch.zeros(len(pred_j), dtype=torch.long).to(device)
+            n_pred_nbh = torch.tensor([len(pred_j)], dtype=torch.long).to(device)
+            # build inputs
+            inputs = {}
+            inputs[properties.R] = R[:i]
+            inputs[properties.Z] = Z[:i]
+            inputs[properties.n_atoms] = torch.tensor(i, dtype=torch.long).to(device)
+            inputs[properties.idx_i] = idx_i
+            inputs[properties.idx_j] = idx_j
+            inputs[properties.r_ij] = r_ij
+            inputs[properties.offsets] = offsets[:i]
+            inputs[properties.cell] = torch.zeros((3, 3)).to(device)
+            inputs[properties.pred_idx_j] = pred_j
+            inputs[properties.pred_idx_m] = pred_m
+            inputs[properties.n_pred_nbh] = n_pred_nbh
+            inputs[properties.n_nbh] = torch.unique_consecutive(
+                idx_i, return_counts=True
+            )[1]
+            # extract conditions for inputs
+            for cond_name in conditions["trajectory"]:
+                cond = torch.tensor(conditions["trajectory"][cond_name], device=device)
+                s = cond.size()
+                inputs[cond_name] = cond.expand(len(pred_j), *s).squeeze()
+            # predict type
+            inputs = model.extract_atom_wise_features(inputs)
+            inputs = model.extract_conditioning_features(inputs)
+            inputs = model.predict_type(inputs, use_log_probabilities=False)
+            # sample type
+            next_class = torch.multinomial(inputs[properties.distribution_Z], 1)
+            next_type = model.classes_to_types(next_class)
+            if print_progress:
+                print(f"Current focus: {focus}")
+                print(f"Type distribution: {inputs[properties.distribution_Z]}")
+                print(f"Sampled type: {next_type}\n")
+            if next_type != model.stop_type:
+                # sampled a proper type -> fill Z
+                Z[i] = next_type
+                sampled_proper_type = True
+                if i == n_tokens:
+                    available_atoms[1] = 0  # origin cannot be focused anymore
+            else:
+                # sampled stop -> remove current focus from available_atoms
+                available_atoms[focus] = 0.0
+                if available_atoms[:i].sum() <= 0:
+                    R -= R[1:2].clone()
+                    if view_progress:
+                        view(ats)
+                    return R[None], Z[None], [(0, i - n_tokens)]
+
+        # sample position of the next atom
+        if i == n_tokens:
+            grid = grid_1d
+        elif i < max_n_atoms + n_tokens:
+            grid = grid_3d
+        else:
+            return R, Z, []  # molecule not finished
+        # first get probabilities of pairwise distances from model
+        inputs_dists = {
+            "representation": inputs["representation"],
+            properties.pred_r_ij_idcs: torch.arange(len(pred_j), device=device),
+            properties.next_Z: torch.full(
+                (len(pred_j),),
+                fill_value=int(next_type),
+                dtype=torch.long,
+                device=device,
+            ),
+        }
+        inputs_dists = model.predict_distances(inputs_dists, True)
+        predictions = inputs_dists[properties.distribution_r_ij]
+        # then compute the distances between the atoms and grid positions
+        dists = cdists(R[pred_j], grid)
+        # and assign distances to bins in the model output
+        bins = model.dists_to_classes(dists)
+        # finally look up the probabilities of distances on the model predictions
+        log_p_atom = torch.gather(predictions, dim=1, index=bins)
+        # and aggregate grids for individual atoms to get 3d distribution
+        log_p_mol = torch.sum(log_p_atom, dim=0)
+        # normalize over grid and sample position
+        log_p_mol -= torch.logsumexp(log_p_mol, dim=-1)
+        if i > n_tokens:  # do not use temperature parameter in first step
+            log_p_mol /= t
+            log_p_mol -= torch.logsumexp(log_p_mol, dim=-1)
+        # sample position of next atom from candidates
+        next_pos_idx = torch.multinomial(log_p_mol.exp_(), 1)
+        # store sampled positions of the next atom
+        R[i] = grid[next_pos_idx]
+
+        if view_progress:
+            ats += [
+                Atoms(
+                    positions=(R[n_tokens : i + 1].clone() - R[1:2])
+                    .detach()
+                    .cpu()
+                    .numpy(),
+                    numbers=Z[n_tokens : i + 1].detach().cpu().numpy(),
+                )
+            ]
+
+    return R, Z, []

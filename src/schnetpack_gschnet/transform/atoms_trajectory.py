@@ -442,7 +442,7 @@ class BuildAtomsTrajectory(Transform):
                 ]
                 n_pred_nbh += [n_prediction_atoms]
                 if next_atom != -1:
-                    # compute and store distances between new atom in and the atoms
+                    # compute and store distances between new atom and the atoms
                     # used for prediction
                     new_dists = torch.linalg.norm(
                         R[None, next_atom] - R_ordered[new_pred_j], dim=1

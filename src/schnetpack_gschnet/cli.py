@@ -16,7 +16,10 @@ from ase import Atoms
 from tqdm import tqdm
 
 from schnetpack.utils.script import print_config
-from schnetpack_gschnet.generate_molecules import generate_molecules
+from schnetpack_gschnet.generate_molecules import (
+    generate_molecules,
+    generate_molecules_debug,
+)
 
 log = logging.getLogger(__name__)
 
@@ -79,6 +82,12 @@ def generate(config: DictConfig):
 
     # compute number of required batches
     n_batches = int(np.ceil(config.generate.n_molecules / config.generate.batch_size))
+    if config.debug.run:
+        n_batches = config.generate.n_molecules
+        log.info(
+            f"Caution: Using debug version of the generation function. The batch size "
+            f"is automatically set to 1."
+        )
 
     # generate molecules in batches
     log.info(
@@ -91,17 +100,30 @@ def generate(config: DictConfig):
             # generate
             remaining = config.generate.n_molecules - i * config.generate.batch_size
             with torch.no_grad():
-                R, Z, finished_list = generate_molecules(
-                    model=model,
-                    n_molecules=min(config.generate.batch_size, remaining),
-                    max_n_atoms=config.generate.max_n_atoms,
-                    grid_distance_min=config.generate.grid_distance_min,
-                    grid_spacing=config.generate.grid_spacing,
-                    conditions=config.conditions,
-                    device=device,
-                    t=config.generate.temperature_term,
-                    grid_batch_size=config.generate.grid_batch_size,
-                )
+                if not config.debug.run:
+                    R, Z, finished_list = generate_molecules(
+                        model=model,
+                        n_molecules=min(config.generate.batch_size, remaining),
+                        max_n_atoms=config.generate.max_n_atoms,
+                        grid_distance_min=config.generate.grid_distance_min,
+                        grid_spacing=config.generate.grid_spacing,
+                        conditions=config.conditions,
+                        device=device,
+                        t=config.generate.temperature_term,
+                        grid_batch_size=config.generate.grid_batch_size,
+                    )
+                else:
+                    R, Z, finished_list = generate_molecules_debug(
+                        model=model,
+                        max_n_atoms=config.generate.max_n_atoms,
+                        grid_distance_min=config.generate.grid_distance_min,
+                        grid_spacing=config.generate.grid_spacing,
+                        conditions=config.conditions,
+                        device=device,
+                        t=config.generate.temperature_term,
+                        print_progress=config.debug.print_progress,
+                        view_progress=config.debug.view_progress,
+                    )
 
                 # store generated molecules in db
                 R = R.cpu().numpy()

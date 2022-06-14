@@ -19,6 +19,11 @@ use_gpu: True
 print_config: True
 view_molecules: False
 
+debug:
+  run: False
+  print_progress: False
+  view_progress: False
+
 # hydra configuration
 hydra:
     # output paths for hydra logs

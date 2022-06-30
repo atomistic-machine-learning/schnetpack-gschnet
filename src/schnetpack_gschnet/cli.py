@@ -27,7 +27,7 @@ OmegaConf.register_new_resolver("uuid", lambda x: str(uuid.uuid1()))
 OmegaConf.register_new_resolver("tmpdir", tempfile.mkdtemp, use_cache=True)
 
 
-@hydra.main(config_path="configs", config_name="generate_molecules")
+@hydra.main(config_path="configs", config_name="generate_molecules", version_base="1.2")
 def generate(config: DictConfig):
 
     # create output file where the generated molecules will be written to

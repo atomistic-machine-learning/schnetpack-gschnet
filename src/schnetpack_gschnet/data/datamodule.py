@@ -274,7 +274,7 @@ class GenerativeAtomsDataModule(AtomsDataModule):
         self._val_dataset = self.dataset.subset(self.val_idx)
         self._test_dataset = self.dataset.subset(self.test_idx)
 
-        self.setup_transforms()
+        self._setup_transforms()
 
     # storing placement cutoff information in split file
     def load_partitions(self):

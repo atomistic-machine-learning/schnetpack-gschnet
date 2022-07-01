@@ -93,7 +93,7 @@ class ConditionalGenerativeSchNetTask(pl.LightningModule):
                         self.model.placement_cutoff,
                     )
         if stage == "fit":
-            self.model.initialize_postprocessors(dm)
+            self.model.initialize_transforms(dm)
 
     def forward(self, inputs: Dict[str, torch.Tensor]):
         results = self.model(inputs)

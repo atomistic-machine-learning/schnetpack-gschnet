@@ -44,13 +44,15 @@ data:
   num_train: 50000
   num_val: 5000
   data_workdir: ${globals.data_workdir}
-  train_filter:
-    - property: composition
-      operator: ==
-      value: [10, 7, 0, 2, 0]
-  train_filter_transforms:
-    - _target_: schnetpack_gschnet.transform.GetComposition
-      atom_types: ${globals.atom_types}
+  splitting:
+    _target_: gschnet.data.FilteredRandomSplit
+    filters:
+      - property: composition
+        operator: ==
+        value: [10, 7, 0, 2, 0]
+    transforms:
+      - _target_: schnetpack_gschnet.transform.GetComposition
+        atom_types: ${globals.atom_types}
   transforms:
     - _target_: schnetpack.transform.SubtractCenterOfMass
     - _target_: schnetpack_gschnet.transform.OrderByDistanceToOrigin

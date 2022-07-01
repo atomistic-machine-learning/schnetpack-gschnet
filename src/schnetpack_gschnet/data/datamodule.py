@@ -21,6 +21,8 @@ from schnetpack.data import (
     AtomsLoader,
     AtomsDataModule,
     AtomsDataModuleError,
+    SplittingStrategy,
+    RandomSplit,
 )
 from schnetpack_gschnet.data import gschnet_collate_fn
 
@@ -51,8 +53,6 @@ class GenerativeAtomsDataModule(AtomsDataModule):
         train_transforms: Optional[List[torch.nn.Module]] = None,
         val_transforms: Optional[List[torch.nn.Module]] = None,
         test_transforms: Optional[List[torch.nn.Module]] = None,
-        train_filter_transforms: Optional[List[torch.nn.Module]] = None,
-        train_filter: Optional[List[Dict]] = None,
         num_workers: int = 8,
         num_val_workers: Optional[int] = None,
         num_test_workers: Optional[int] = None,
@@ -60,6 +60,8 @@ class GenerativeAtomsDataModule(AtomsDataModule):
         distance_unit: Optional[str] = None,
         data_workdir: Optional[str] = None,
         cleanup_workdir_stage: Optional[str] = "test",
+        splitting: Optional[SplittingStrategy] = None,
+        pin_memory: Optional[bool] = None,
     ):
         """
         Args:
@@ -92,14 +94,6 @@ class GenerativeAtomsDataModule(AtomsDataModule):
             train_transforms: Overrides transform_fn for training.
             val_transforms: Overrides transform_fn for validation.
             test_transforms: Overrides transform_fn for testing.
-            train_filter_transforms: Preprocessing transform applied to each system
-                before the train_filter is applied (e.g. to extract the composition)
-            train_filter: List of filters used to exclude certain structures from the
-                training and validation splits (e.g. certain compositions or molecules
-                with specific property values). The excluded structures are included in
-                the test split. Each molecule that matches at least one of the filters
-                in the list is excluded (i.e. we take the union of the result of each
-                individual filter to obtain the set of excluded structures).
             num_workers: Number of data loader workers.
             num_val_workers: Number of validation data loader workers (overrides
                 num_workers).
@@ -113,6 +107,11 @@ class GenerativeAtomsDataModule(AtomsDataModule):
                 faster performance.
             cleanup_workdir_stage: Determines after which stage to remove the data
                 workdir.
+            splitting: Method to generate train/validation/test partitions
+                (default: RandomSplit)
+            pin_memory: If true, pin memory of loaded data to GPU. Default: Will be
+                set to true, when GPUs are used.
+
         """
         super().__init__(
             datapath=datapath,
@@ -136,22 +135,13 @@ class GenerativeAtomsDataModule(AtomsDataModule):
             distance_unit=distance_unit,
             data_workdir=data_workdir,
             cleanup_workdir_stage=cleanup_workdir_stage,
+            splitting=splitting,
+            pin_memory=pin_memory,
         )
 
         self.placement_cutoff = placement_cutoff
         self.use_covalent_radii = use_covalent_radii
         self.covalent_radius_factor = covalent_radius_factor
-        self.train_filter_transforms = train_filter_transforms
-        self.train_filter = train_filter
-        self.operators = {
-            "!=": operator.ne,
-            "==": operator.eq,
-            "=": operator.eq,
-            "<=": operator.le,
-            "<": operator.lt,
-            ">=": operator.ge,
-            ">": operator.gt,
-        }
         self.subset_idx = None
 
     def setup(self, stage: Optional[str] = None):
@@ -364,7 +354,9 @@ class GenerativeAtomsDataModule(AtomsDataModule):
                         f"Please choose lower numbers."
                     )
 
-            self.train_idx, self.val_idx, self.test_idx = self._split_data()
+            self.train_idx, self.val_idx, self.test_idx = self.splitting.split(
+                self.dataset, self.num_train, self.num_val, self.num_test
+            )
 
             if self.split_file is not None:
                 np.savez(
@@ -374,88 +366,6 @@ class GenerativeAtomsDataModule(AtomsDataModule):
                     test_idx=self.test_idx,
                     placement_cutoff=self.placement_cutoff,
                 )
-
-    def _split_data(self):
-        if self.train_filter is None:
-            return super()._split_data()
-        else:
-            logging.info(
-                f"Filtering structures to excluded molecules from training and "
-                f"validation splits according to the filter: "
-                f"{self.train_filter}."
-            )
-            # initialize transforms (leads to errors if train/val/test split required)
-            if self.train_filter_transforms is not None:
-                for t in self.train_filter_transforms:
-                    t.datamodule(self)
-            # find molecules to exclude from train/val split using the filter
-            excluded = np.zeros(len(self.dataset), dtype=bool)
-            for i in tqdm(range(len(self.dataset))):
-                # get data point
-                inputs = self.dataset[i]
-                # apply transforms
-                if self.train_filter_transforms is not None:
-                    for t in self.train_filter_transforms:
-                        inputs = t(inputs)
-                for f in self.train_filter:
-                    prop = f["property"]
-                    op = f["operator"]
-                    value = f["value"]
-                    if not isinstance(op, str):
-                        for j in range(len(op)):
-                            exclude = True
-                            if not self._apply_filter(op[j], inputs[prop[j]], value[j]):
-                                exclude = False  # filter does not apply to data point
-                                break
-                    else:
-                        exclude = self._apply_filter(op, inputs[prop], value)
-                    if exclude:
-                        excluded[i] = True
-                        break
-
-            # split data accordingly
-            n_excluded = np.sum(excluded)
-            n_included = len(self.dataset) - n_excluded
-            logging.info(
-                f"Excluded {n_excluded} structures that match the filter from the "
-                f"training and validation splits."
-            )
-            if self.num_train + self.num_val > len(self.dataset) - n_excluded:
-                raise ValueError(
-                    f"Your filter is too restrictive! {self.num_train} + {self.num_val}"
-                    f" data points are required for train + val splits, but only "
-                    f"{n_included} data points are available. {n_excluded} data "
-                    f"points were removed due to the filter: {self.train_filter}."
-                )
-            if self.num_test is None:
-                self.num_test = n_included - self.num_train - self.num_val
-            else:
-                if self.num_test - n_excluded < 0:
-                    raise ValueError(
-                        f"The selected test split size ({self.num_test}) is larger "
-                        f"than the number of excluded molecules ({n_excluded}), which "
-                        f"are supposed to be automatically assigned to the test split. "
-                        f"Please increase the size of the test split."
-                    )
-            lengths = [self.num_train, self.num_val, self.num_test]
-            offsets = torch.cumsum(torch.tensor(lengths), dim=0)
-            indices = np.random.permutation(np.nonzero(~excluded)[0]).tolist()
-            train_idx, val_idx, test_idx = [
-                indices[offset - length : offset]
-                for offset, length in zip(offsets, lengths)
-            ]
-            test_idx += np.nonzero(excluded)[0].tolist()  # add excluded to test split
-            self.num_test = len(test_idx)
-            return train_idx, val_idx, test_idx
-
-    def _apply_filter(self, op, val1, val2):
-        op = self.operators[op]
-        if isinstance(val1, torch.Tensor):
-            val1 = val1.squeeze().tolist()
-        if isinstance(val1, List):
-            return all([op(v1, v2) for v1, v2 in zip(val1, val2)])
-        else:
-            return op(val1, val2)
 
     def register_properties(self, properties: List[str]):
         if properties is not None and len(properties) > 0:

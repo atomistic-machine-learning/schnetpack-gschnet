@@ -1,7 +1,6 @@
 # @package _global_
 
 defaults:
-  - _self_
   - override /data: gschnet_qm9
   - override /task: gschnet_task
   - override /callbacks:

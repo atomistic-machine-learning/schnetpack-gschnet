@@ -171,7 +171,28 @@ class ConditionalGenerativeSchNetTask(pl.LightningModule):
                 optimconf["monitor"] = self.schedule_monitor
             return [optimizer], [optimconf]
         else:
+
+            def save_model(self, path: str, do_postprocessing: Optional[bool] = None):
+                if self.trainer is None or self.trainer.strategy.local_rank == 0:
+                    pp_status = self.model.do_postprocessing
+                    if do_postprocessing is not None:
+                        self.model.do_postprocessing = do_postprocessing
+
+                    torch.save(self.model, path)
+
+                    self.model.do_postprocessing = pp_status
+
             return optimizer
+
+    def save_model(self, path: str, do_postprocessing: Optional[bool] = None):
+        if self.trainer is None or self.trainer.strategy.local_rank == 0:
+            pp_status = self.model.do_postprocessing
+            if do_postprocessing is not None:
+                self.model.do_postprocessing = do_postprocessing
+
+            torch.save(self.model, path)
+
+            self.model.do_postprocessing = pp_status
 
     def to_torchscript(
         self,

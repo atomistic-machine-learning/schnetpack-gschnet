@@ -72,7 +72,7 @@ def generate(config: DictConfig):
         device = torch.device("cpu")
 
     # load model
-    model = torch.load("best_inference_model", map_location=device)
+    model = torch.load("best_model", map_location=device)
 
     # parse composition (if it is included in conditions)
     original_conditions = OmegaConf.to_container(config.conditions)

@@ -44,7 +44,7 @@ callbacks:
 data:
   batch_size: 5
   num_train: 50000
-  num_val: 1
+  num_val: 5000
   data_workdir: ${globals.data_workdir}
   transforms:
     - _target_: schnetpack.transform.SubtractCenterOfMass

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Dict, Optional, List, Callable
+from typing import Dict, Optional, List, Callable, Union, Sequence
 
 from schnetpack.transform import Transform
 from schnetpack.model import AtomisticModel
@@ -22,6 +22,7 @@ __all__ = [
     "ConditionEmbedding",
     "ScalarConditionEmbedding",
     "CompositionEmbedding",
+    "VectorialConditionEmbedding",
 ]
 
 
@@ -513,6 +514,67 @@ class ScalarConditionEmbedding(ConditionEmbedding):
         expanded_condition = self.gaussian_expansion(scalar_condition)
         # feed through fully connected network
         embedded_condition = self.dense_net(expanded_condition)
+        return embedded_condition
+
+
+class VectorialConditionEmbedding(ConditionEmbedding):
+    """
+    An embedding network for vectorial conditions (e.g. a fingerprint). The vector is
+    mapped to the final embedding with a fully connected neural network.
+    """
+
+    def __init__(
+        self,
+        condition_name: str,
+        condition_type: str,
+        n_in: int,
+        n_features: int,
+        n_layers: int,
+        n_hidden: Optional[Union[int, Sequence[int]]] = None,
+        activation: Callable = shifted_softplus,
+        required_data_properties: Optional[List[str]] = [],
+    ):
+        """
+        Args:
+            condition_name: The name of the condition (e.g. `_fingerprint`).
+            condition_type: The type of the condition, either `trajectory`, `step`, or
+                `atom` for trajectory-wise, step-wise, or atom-wise conditions,
+                respectively.
+            n_in: The number of features in the input vector (i.e. of the condition).
+            n_features: The number of features in the final embedding vector.
+            n_layers: The number of layers in the fully connected network that maps
+                from the input vector to the final embedding vector.
+            n_hidden: The number of features in each hidden layer.
+                If an integer, the same number of features is used for all hidden layers
+                resulting in a rectangular network.
+                If None, the number of features is divided by two after each layer
+                (starting with n_in) resulting in a pyramidal network.
+            activation: Activation function used after all but the last layer of the
+                fully connected network.
+            required_data_properties: Names of the properties that need to be loaded
+                from the data set in order to compute the condition (e.g. `fingerprint`
+                if the fingerprint is required).
+        """
+        super().__init__(
+            condition_name, condition_type, n_features, required_data_properties
+        )
+        # initialize fully connected network
+        self.dense_net = build_mlp(
+            n_in=n_in,
+            n_out=n_features,
+            n_hidden=n_hidden,
+            n_layers=n_layers,
+            activation=activation,
+        )
+
+    def forward(
+        self,
+        inputs: Dict[str, torch.Tensor],
+    ) -> torch.Tensor:
+        # get the vectorial condition value
+        vectorial_condition = inputs[self.condition_name]
+        # feed through fully connected network
+        embedded_condition = self.dense_net(vectorial_condition)
         return embedded_condition
 
 

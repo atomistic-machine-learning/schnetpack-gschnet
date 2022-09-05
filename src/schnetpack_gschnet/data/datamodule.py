@@ -2,7 +2,7 @@ import os
 import shutil
 import logging
 import operator
-from typing import Optional, List, Dict, Tuple, Union, Iterable
+from typing import Optional, List, Dict, Tuple, Union, Iterable, Any
 from tqdm import tqdm
 from multiprocessing import Pool
 from ase.db import connect
@@ -143,8 +143,12 @@ class GenerativeAtomsDataModule(AtomsDataModule):
         self.use_covalent_radii = use_covalent_radii
         self.covalent_radius_factor = covalent_radius_factor
         self.subset_idx = None
+        self.registered_properties = None
 
     def setup(self, stage: Optional[str] = None):
+        if self.trainer.ckpt_path is not None and stage != "load_checkpoint":
+            # skip setup, it will be called after restoring the checkpoint
+            return
         # check whether data needs to be copied
         if self.data_workdir is None:
             datapath = self.datapath
@@ -367,7 +371,27 @@ class GenerativeAtomsDataModule(AtomsDataModule):
                     placement_cutoff=self.placement_cutoff,
                 )
 
+    def state_dict(self):
+        return {
+            "subset_idx": self.subset_idx,
+            "load_properties": self.load_properties,
+            "train_transforms": self.train_transforms,
+            "val_transforms": self.val_transforms,
+            "test_transforms": self.test_transforms,
+        }
+
+    def load_state_dict(self, state_dict: Dict[str, Any]) -> None:
+        self.subset_idx = state_dict["subset_idx"]
+        self._train_transforms = state_dict["train_transforms"]
+        self._val_transforms = state_dict["val_transforms"]
+        self._test_transforms = state_dict["test_transforms"]
+        self.load_properties = state_dict["load_properties"]
+        self.setup(stage="load_checkpoint")
+
     def register_properties(self, properties: List[str]):
+        if self.dataset is None:
+            # dataset not yet initialized, properties will be determined from checkpoint
+            return
         if properties is not None and len(properties) > 0:
             available_properties = self.dataset.available_properties
             for p in properties:

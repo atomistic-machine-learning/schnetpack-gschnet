@@ -54,7 +54,7 @@ N. Gebauer, M. Gastegger, and K. Schütt. _Symmetry-adapted generation of 3d poi
 
 ### Installation
 
-Please clone this repository as well as the newest SchNetPack version from the dev branch ([find it here](https://github.com/atomistic-machine-learning/schnetpack/tree/dev)). In the following, please replace `<schnetpack/path>` and `<schnetpack-gschnet/path>` with the correct paths to the cloned repositories on your system.
+Please clone this repository as well as the newest SchNetPack version ([find it here](https://github.com/atomistic-machine-learning/schnetpack/tree/master/)). In the following, please replace `<schnetpack/path>` and `<schnetpack-gschnet/path>` with the correct paths to the cloned repositories on your system.
 You can set up a fresh conda environment called `gschnet` and install G-SchNet as well as all requirements as follows (tested on Ubuntu 20.04):
 
 ```

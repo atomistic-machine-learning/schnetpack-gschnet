@@ -54,7 +54,7 @@ class ConditionalGenerativeSchNet(AtomisticModel):
         distance_prediction_min_dist: float = 0.0,
         distance_prediction_max_dist: float = 15.0,
         postprocessors: Optional[List[Transform]] = None,
-        input_dtype: torch.dtype = torch.float32,
+        input_dtype_str: str = "float32",
         do_postprocessing: bool = False,
         legacy_type_normalization: bool = False,
     ):
@@ -104,7 +104,7 @@ class ConditionalGenerativeSchNet(AtomisticModel):
                 the last bin).
             postprocessors: Post-processing transforms tha may be initialized using the
                 `datamodule`, but are not applied during training.
-            input_dtype: The dtype of real inputs.
+            input_dtype_str: The dtype of real inputs as string.
             do_postprocessing: If true, post-processing is applied.
             legacy_type_normalization: If true, the distribution of the atom types will
                 be normalized as in previous implementations of G-SchNet, i.e. taking
@@ -112,8 +112,8 @@ class ConditionalGenerativeSchNet(AtomisticModel):
                 atoms for each type, and taking the softmax over all types again.
         """
         super().__init__(
-            input_dtype=input_dtype,
             postprocessors=postprocessors,
+            input_dtype_str=input_dtype_str,
             do_postprocessing=do_postprocessing,
         )
         if stop_type in atom_types:

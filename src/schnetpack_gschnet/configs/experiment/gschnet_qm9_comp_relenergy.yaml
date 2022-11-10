@@ -15,6 +15,7 @@ defaults:
 run:
   path: models/qm9_${globals.name}
   id: ${globals.id}
+  ckpt_path: null
 
 globals:
   model_cutoff: 10.

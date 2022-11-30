@@ -102,7 +102,7 @@ class ConditionalGenerativeSchNet(AtomisticModel):
             distance_prediction_max_dist: Maximum distance covered by the bins of the
                 discretized distance distribution (all larger distances are mapped to
                 the last bin).
-            postprocessors: Post-processing transforms tha may be initialized using the
+            postprocessors: Post-processing transforms that may be initialized using the
                 `datamodule`, but are not applied during training.
             input_dtype_str: The dtype of real inputs as string.
             do_postprocessing: If true, post-processing is applied.

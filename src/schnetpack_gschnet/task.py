@@ -11,11 +11,12 @@ from schnetpack_gschnet.transform import (
 )
 from schnetpack_gschnet.model import ConditionalGenerativeSchNet
 from schnetpack_gschnet import properties
+from schnetpack import AtomisticTask
 
 __all__ = ["ConditionalGenerativeSchNetTask"]
 
 
-class ConditionalGenerativeSchNetTask(pl.LightningModule):
+class ConditionalGenerativeSchNetTask(AtomisticTask):
     """
     Defines a generative learning task with cG-SchNet.
 
@@ -46,18 +47,19 @@ class ConditionalGenerativeSchNetTask(pl.LightningModule):
             scheduler_args: Dict of scheduler keyword arguments
             scheduler_monitor: Name of metric to be observed for ReduceLROnPlateau.
         """
-        super().__init__()
-        self.model = model
-        self.optimizer_cls = optimizer_cls
-        self.optimizer_kwargs = optimizer_args
-        self.scheduler_cls = scheduler_cls
-        self.scheduler_kwargs = scheduler_args
-        self.schedule_monitor = scheduler_monitor
-
-        self.grad_enabled = len(self.model.required_derivatives) > 0
-        self.inference_mode = False
-
+        super().__init__(
+            model=model,
+            outputs=[],
+            optimizer_cls=optimizer_cls,
+            optimizer_args=optimizer_args,
+            scheduler_cls=scheduler_cls,
+            scheduler_args=scheduler_args,
+            scheduler_monitor=scheduler_monitor,
+            warmup_steps=0,
+        )
+        # initialize loss function for atom type predictions
         self.type_loss_fn = nn.NLLLoss(reduction="mean")
+        # initialize loss function for distance predictions
         if dist_label_width_factor >= 0.01:
             self.dists_loss_fn = nn.KLDivLoss(reduction="batchmean")
             gaussian_centers = torch.linspace(
@@ -95,10 +97,6 @@ class ConditionalGenerativeSchNetTask(pl.LightningModule):
         if stage == "fit":
             self.model.initialize_transforms(dm)
 
-    def forward(self, inputs: Dict[str, torch.Tensor]):
-        results = self.model(inputs)
-        return results
-
     def loss_fn(self, pred, batch, return_individual_losses=False):
         # calculate loss on type predictions (NLL loss using atomic types as classes)
         type_labels = batch[properties.pred_Z]
@@ -135,77 +133,32 @@ class ConditionalGenerativeSchNetTask(pl.LightningModule):
             return type_loss + dist_loss
 
     def training_step(self, batch, batch_idx):
-        pred = self(batch)
+        pred = self.predict_without_postprocessing(batch)
         loss = self.loss_fn(pred, batch)
         self.log("train_loss", loss, on_step=False, on_epoch=True, prog_bar=False)
         return loss
 
     def validation_step(self, batch, batch_idx):
         torch.set_grad_enabled(self.grad_enabled)
-        pred = self(batch)
+        pred = self.predict_without_postprocessing(batch)
         loss = self.loss_fn(pred, batch, return_individual_losses=True)
         self.log("val_loss", loss[0], on_step=False, on_epoch=True, prog_bar=True)
-        self.log("val_loss_type", loss[1], on_step=False, on_epoch=True, prog_bar=True)
-        self.log("val_loss_dist", loss[2], on_step=False, on_epoch=True, prog_bar=True)
+        self.log("val_loss_type", loss[1], on_step=False, on_epoch=True, prog_bar=False)
+        self.log("val_loss_dist", loss[2], on_step=False, on_epoch=True, prog_bar=False)
         return {"val_loss": loss[0]}
 
     def test_step(self, batch, batch_idx):
         torch.set_grad_enabled(self.grad_enabled)
-        pred = self(batch)
+        pred = self.predict_without_postprocessing(batch)
         loss = self.loss_fn(pred, batch, return_individual_losses=True)
         self.log("test_loss", loss[0], on_step=False, on_epoch=True, prog_bar=True)
-        self.log("test_loss_type", loss[1], on_step=False, on_epoch=True, prog_bar=True)
-        self.log("test_loss_dist", loss[2], on_step=False, on_epoch=True, prog_bar=True)
-        return {"test_loss": loss[0]}
-
-    def configure_optimizers(self):
-        optimizer = self.optimizer_cls(
-            params=self.parameters(), **self.optimizer_kwargs
+        self.log(
+            "test_loss_type", loss[1], on_step=False, on_epoch=True, prog_bar=False
         )
-
-        if self.scheduler_cls:
-            schedule = self.scheduler_cls(optimizer=optimizer, **self.scheduler_kwargs)
-
-            optimconf = {"scheduler": schedule, "name": "lr_schedule"}
-            if self.schedule_monitor:
-                optimconf["monitor"] = self.schedule_monitor
-            return [optimizer], [optimconf]
-        else:
-
-            def save_model(self, path: str, do_postprocessing: Optional[bool] = None):
-                if self.trainer is None or self.trainer.strategy.local_rank == 0:
-                    pp_status = self.model.do_postprocessing
-                    if do_postprocessing is not None:
-                        self.model.do_postprocessing = do_postprocessing
-
-                    torch.save(self.model, path)
-
-                    self.model.do_postprocessing = pp_status
-
-            return optimizer
-
-    def save_model(self, path: str, do_postprocessing: Optional[bool] = None):
-        if self.trainer is None or self.trainer.strategy.local_rank == 0:
-            pp_status = self.model.do_postprocessing
-            if do_postprocessing is not None:
-                self.model.do_postprocessing = do_postprocessing
-
-            torch.save(self.model, path)
-
-            self.model.do_postprocessing = pp_status
-
-    def to_torchscript(
-        self,
-        file_path: Optional[Union[str, Path]] = None,
-        method: Optional[str] = "script",
-        example_inputs: Optional[Any] = None,
-        **kwargs,
-    ) -> Union[torch.ScriptModule, Dict[str, torch.ScriptModule]]:
-        imode = self.inference_mode
-        self.inference_mode = True
-        script = super().to_torchscript(file_path, method, example_inputs, **kwargs)
-        self.inference_mode = imode
-        return script
+        self.log(
+            "test_loss_dist", loss[2], on_step=False, on_epoch=True, prog_bar=False
+        )
+        return {"test_loss": loss[0]}
 
     def extract_features(
         self, inputs: Dict[str, torch.Tensor]

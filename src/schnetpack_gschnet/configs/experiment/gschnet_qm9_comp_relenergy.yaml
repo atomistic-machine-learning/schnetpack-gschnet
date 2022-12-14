@@ -46,7 +46,6 @@ data:
   batch_size: 5
   num_train: 50000
   num_val: 5000
-  data_workdir: ${globals.data_workdir}
   splitting:
     _target_: schnetpack_gschnet.data.FilteredRandomSplit
     filters:

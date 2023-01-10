@@ -56,7 +56,7 @@ class ConditionalGenerativeSchNet(AtomisticModel):
         postprocessors: Optional[List[Transform]] = None,
         input_dtype_str: str = "float32",
         do_postprocessing: bool = False,
-        legacy_type_normalization: bool = False,
+        average_type_distributions: bool = False,
     ):
         """
         Args:
@@ -106,10 +106,16 @@ class ConditionalGenerativeSchNet(AtomisticModel):
                 `datamodule`, but are not applied during training.
             input_dtype_str: The dtype of real inputs as string.
             do_postprocessing: If true, post-processing is applied.
-            legacy_type_normalization: If true, the distribution of the atom types will
-                be normalized as in previous implementations of G-SchNet, i.e. taking
-                the softmax over all types, multiplying the predictions of all previous
-                atoms for each type, and taking the softmax over all types again.
+            average_type_distributions: Determines how the distribution of the type of
+                the next atom is computed from all the distributions predicted by
+                individual atoms. In any case, the individual distributions are first
+                normalized with a softmax.
+                If true, the average of individual distributions is taken as the
+                prediction.
+                If false, the individual distributions are instead multiplied
+                element-wise and then normalized by taking the softmax again, which
+                leads to sharper distributions compared to the averaging, i.e. it
+                further suppresses small probabilities and increases large ones.
         """
         super().__init__(
             postprocessors=postprocessors,
@@ -187,7 +193,7 @@ class ConditionalGenerativeSchNet(AtomisticModel):
         self.logsoftmax = nn.LogSoftmax(dim=-1)
 
         self.collect_derivatives()
-        self.legacy_type_normalization = legacy_type_normalization
+        self.average_type_distributions = average_type_distributions
 
     def forward(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
         # extract atom-wise features from placed atoms
@@ -230,7 +236,7 @@ class ConditionalGenerativeSchNet(AtomisticModel):
         # get predictions for the type of the next atom (from all atoms within the
         # prediction cutoff)
         predictions = self.type_prediction_net(inputs["representation"])
-        if not self.legacy_type_normalization:
+        if self.average_type_distributions:
             # normalize these to get distributions
             predictions = self.softmax(predictions)
             # sum the distributions of all neighbors

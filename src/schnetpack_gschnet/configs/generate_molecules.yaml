@@ -1,19 +1,11 @@
 # @package _global_
 defaults:
-  - conditions: no_conditions
+  - generate: default_generate
   - _self_
 
 modeldir: ???
 workdir: ${tmpdir:_generated_molecules}
 outputfile: generated_molecules_${oc.env:JOB_ID,0}_${oc.env:TASK_ID,0}.db
-generate:
-  n_molecules: 100
-  batch_size: 10
-  max_n_atoms: 35
-  grid_distance_min: 0.7
-  grid_spacing: 0.05
-  temperature_term: 0.1
-  grid_batch_size: -1
 
 use_gpu: True
 print_config: True
@@ -36,7 +28,7 @@ hydra:
     output_subdir: null
 
     help:
-      app_name: SchNetPack.Modelzoo G-SchNet Predict
+      app_name: schnetpack-gschnet G-SchNet Generate
 
       template: |-
         SchNetPack

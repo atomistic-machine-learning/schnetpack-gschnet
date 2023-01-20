@@ -4,8 +4,8 @@ defaults:
   - _self_
 
 modeldir: ???
-workdir: ${tmpdir:_generated_molecules}
-outputfile: generated_molecules_${oc.env:JOB_ID,0}_${oc.env:TASK_ID,0}.db
+workdir: null
+outputfile: null
 
 use_gpu: True
 print_config: True
@@ -15,6 +15,10 @@ debug:
   run: False
   print_progress: False
   view_progress: False
+
+settings:
+  conditions:
+    trajectory: ${generate.conditions}
 
 # hydra configuration
 hydra:

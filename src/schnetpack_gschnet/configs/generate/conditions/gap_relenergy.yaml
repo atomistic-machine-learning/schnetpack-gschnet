@@ -1,3 +1,2 @@
-trajectory:
-  gap: 4.0
-  relative_atomic_energy: -0.2
+gap: 4.0
+relative_atomic_energy: -0.2

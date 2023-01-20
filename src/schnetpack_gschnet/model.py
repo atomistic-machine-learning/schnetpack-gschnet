@@ -414,20 +414,20 @@ class ConditionEmbedding(nn.Module):
     def __init__(
         self,
         condition_name: str,
-        condition_type: str,
         n_features: int,
         required_data_properties: Optional[List[str]] = [],
+        condition_type: str = "trajectory",
     ):
         """
         Args:
             condition_name: The name of the condition (e.g. `_composition`).
-            condition_type: The type of the condition, either `trajectory`, `step`, or
-                `atom` for trajectory-wise, step-wise, or atom-wise conditions,
-                respectively.
             n_features: The number of features in the embedding vector.
             required_data_properties: Names of the properties that need to be loaded
                 from the data set in order to compute the condition (e.g. `energy` if
                 the energy is required).
+            condition_type: The type of the condition, either `trajectory`, `step`, or
+                `atom` for trajectory-wise, step-wise, or atom-wise conditions,
+                respectively.
         """
         super().__init__()
         if condition_type not in ["trajectory", "step", "atom"]:
@@ -458,7 +458,6 @@ class ScalarConditionEmbedding(ConditionEmbedding):
     def __init__(
         self,
         condition_name: str,
-        condition_type: str,
         condition_min: float,
         condition_max: float,
         grid_spacing: float,
@@ -466,13 +465,11 @@ class ScalarConditionEmbedding(ConditionEmbedding):
         n_layers: int,
         activation: Callable = shifted_softplus,
         required_data_properties: Optional[List[str]] = [],
+        condition_type: str = "trajectory",
     ):
         """
         Args:
             condition_name: The name of the condition (e.g. `_energy`).
-            condition_type: The type of the condition, either `trajectory`, `step`, or
-                `atom` for trajectory-wise, step-wise, or atom-wise conditions,
-                respectively.
             condition_min: Minimum value of the scalar condition (center of first
                 Gaussian rbf).
             condition_max: Maximum value of the scalar condition (center of the last
@@ -489,9 +486,12 @@ class ScalarConditionEmbedding(ConditionEmbedding):
             required_data_properties: Names of the properties that need to be loaded
                 from the data set in order to compute the condition (e.g. `energy` if
                 the energy is required).
+            condition_type: The type of the condition, either `trajectory`, `step`, or
+                `atom` for trajectory-wise, step-wise, or atom-wise conditions,
+                respectively.
         """
         super().__init__(
-            condition_name, condition_type, n_features, required_data_properties
+            condition_name, n_features, required_data_properties, condition_type
         )
         # compute the number of rbfs
         n_rbf = math.ceil((condition_max - condition_min) / grid_spacing) + 1
@@ -532,20 +532,17 @@ class VectorialConditionEmbedding(ConditionEmbedding):
     def __init__(
         self,
         condition_name: str,
-        condition_type: str,
         n_in: int,
         n_features: int,
         n_layers: int,
         n_hidden: Optional[Union[int, Sequence[int]]] = None,
         activation: Callable = shifted_softplus,
         required_data_properties: Optional[List[str]] = [],
+        condition_type: str = "trajectory",
     ):
         """
         Args:
             condition_name: The name of the condition (e.g. `_fingerprint`).
-            condition_type: The type of the condition, either `trajectory`, `step`, or
-                `atom` for trajectory-wise, step-wise, or atom-wise conditions,
-                respectively.
             n_in: The number of features in the input vector (i.e. of the condition).
             n_features: The number of features in the final embedding vector.
             n_layers: The number of layers in the fully connected network that maps
@@ -560,9 +557,12 @@ class VectorialConditionEmbedding(ConditionEmbedding):
             required_data_properties: Names of the properties that need to be loaded
                 from the data set in order to compute the condition (e.g. `fingerprint`
                 if the fingerprint is required).
+            condition_type: The type of the condition, either `trajectory`, `step`, or
+                `atom` for trajectory-wise, step-wise, or atom-wise conditions,
+                respectively.
         """
         super().__init__(
-            condition_name, condition_type, n_features, required_data_properties
+            condition_name, n_features, required_data_properties, condition_type
         )
         # initialize fully connected network
         self.dense_net = build_mlp(
@@ -640,9 +640,9 @@ class CompositionEmbedding(ConditionEmbedding):
         """
         super().__init__(
             condition_name=properties.composition,
-            condition_type="trajectory",
             n_features=n_features_concentration,
             required_data_properties=[],
+            condition_type="trajectory",
         )
         self.register_buffer("atom_types", torch.tensor(atom_types, dtype=torch.long))
         self.register_buffer("type_mask", torch.ones(len(atom_types), dtype=bool))

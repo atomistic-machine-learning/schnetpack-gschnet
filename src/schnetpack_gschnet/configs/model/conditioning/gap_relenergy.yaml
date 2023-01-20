@@ -4,7 +4,6 @@ n_layers: 5
 condition_embeddings:
   - _target_: schnetpack_gschnet.ScalarConditionEmbedding
     condition_name: gap
-    condition_type: trajectory
     condition_min: 2
     condition_max: 11
     grid_spacing: 2.25
@@ -14,7 +13,6 @@ condition_embeddings:
       - gap
   - _target_: schnetpack_gschnet.ScalarConditionEmbedding
     condition_name: relative_atomic_energy
-    condition_type: trajectory
     condition_min: -0.2
     condition_max: 0.2
     grid_spacing: 0.1

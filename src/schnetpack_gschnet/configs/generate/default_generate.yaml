@@ -1,5 +1,5 @@
 defaults:
-  - conditions: no_conditions
+  - conditions: null
   - _self_
 
 n_molecules: 100

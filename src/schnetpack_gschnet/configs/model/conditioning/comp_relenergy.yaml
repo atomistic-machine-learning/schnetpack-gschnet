@@ -14,7 +14,6 @@ condition_embeddings:
     grid_spacing_n_atoms: 8.75
   - _target_: schnetpack_gschnet.ScalarConditionEmbedding
     condition_name: relative_atomic_energy
-    condition_type: trajectory
     condition_min: -0.2
     condition_max: 0.2
     grid_spacing: 0.1

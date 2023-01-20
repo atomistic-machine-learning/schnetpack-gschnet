@@ -75,9 +75,9 @@ def generate(config: DictConfig):
     model = torch.load("best_model", map_location=device)
 
     # parse composition (if it is included in conditions)
-    original_conditions = OmegaConf.to_container(config.generate.conditions)
-    config.generate.conditions = parse_composition(
-        config.generate.conditions, model.get_available_atom_types().cpu().numpy()
+    original_conditions = OmegaConf.to_container(config.settings.conditions)
+    config.settings.conditions = parse_composition(
+        config.settings.conditions, model.get_available_atom_types().cpu().numpy()
     )
 
     # compute number of required batches
@@ -107,7 +107,7 @@ def generate(config: DictConfig):
                         max_n_atoms=config.generate.max_n_atoms,
                         grid_distance_min=config.generate.grid_distance_min,
                         grid_spacing=config.generate.grid_spacing,
-                        conditions=config.generate.conditions,
+                        conditions=config.settings.conditions,
                         device=device,
                         t=config.generate.temperature_term,
                         grid_batch_size=config.generate.grid_batch_size,
@@ -118,7 +118,7 @@ def generate(config: DictConfig):
                         max_n_atoms=config.generate.max_n_atoms,
                         grid_distance_min=config.generate.grid_distance_min,
                         grid_spacing=config.generate.grid_spacing,
-                        conditions=config.generate.conditions,
+                        conditions=config.settings.conditions,
                         device=device,
                         t=config.generate.temperature_term,
                         print_progress=config.debug.print_progress,

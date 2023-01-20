@@ -1,5 +1,5 @@
 defaults:
-  - conditioning: comp_relenergy
+  - conditioning: ???
 
 _target_: schnetpack_gschnet.ConditionalGenerativeSchNet
 representation:

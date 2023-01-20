@@ -13,9 +13,8 @@ defaults:
   - override /model/conditioning: null
 
 run:
-  path: models/qm9_${globals.name}
+  path: ${run.work_dir}/models/qm9_${globals.name}
   id: ${globals.id}
-  ckpt_path: null
 
 globals:
   model_cutoff: 10.
@@ -31,8 +30,8 @@ globals:
   draw_random_samples: 0
   name: no_conditions
   id: ${oc.env:JOB_ID,${uuid:1}}_${oc.env:HOSTNAME,""}
-  data_workdir: ${tmpdir:_qm9}/data
-  cache_workdir: ${tmpdir:_qm9}/cache
+  data_workdir: null
+  cache_workdir: null
 
 callbacks:
   early_stopping:
@@ -49,18 +48,13 @@ data:
   transforms:
     - _target_: schnetpack.transform.SubtractCenterOfMass
     - _target_: schnetpack_gschnet.transform.OrderByDistanceToOrigin
-    - _target_: schnetpack_gschnet.transform.GeneralCachedNeighborList
-      cache_path: ${run.work_dir}/cache
-      keep_cache: False
-      cache_workdir: ${globals.cache_workdir}
-      neighbor_list:
-        _target_: schnetpack_gschnet.transform.ConditionalGSchNetNeighborList
-        model_cutoff: ${globals.model_cutoff}
-        prediction_cutoff: ${globals.prediction_cutoff}
-        placement_cutoff: ${globals.placement_cutoff}
-        environment_provider: ase
-        use_covalent_radii: ${globals.use_covalent_radii}
-        covalent_radius_factor: ${globals.covalent_radius_factor}
+    - _target_: schnetpack_gschnet.transform.ConditionalGSchNetNeighborList
+      model_cutoff: ${globals.model_cutoff}
+      prediction_cutoff: ${globals.prediction_cutoff}
+      placement_cutoff: ${globals.placement_cutoff}
+      environment_provider: ase
+      use_covalent_radii: ${globals.use_covalent_radii}
+      covalent_radius_factor: ${globals.covalent_radius_factor}
     - _target_: schnetpack_gschnet.transform.BuildAtomsTrajectory
       centered: True
       origin_type: ${globals.origin_type}

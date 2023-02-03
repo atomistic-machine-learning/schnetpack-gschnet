@@ -13,6 +13,7 @@ representation:
   cutoff_fn:
     _target_: schnetpack.nn.cutoff.CosineCutoff
     cutoff: ${globals.model_cutoff}
+  max_z: 130
 atom_types: ${globals.atom_types}
 origin_type: ${globals.origin_type}
 focus_type: ${globals.focus_type}

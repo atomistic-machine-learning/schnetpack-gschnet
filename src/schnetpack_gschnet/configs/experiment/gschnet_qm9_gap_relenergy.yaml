@@ -23,9 +23,9 @@ globals:
   use_covalent_radii: True
   covalent_radius_factor: 1.1
   atom_types: [1, 6, 7, 8, 9]
-  origin_type: 2
-  focus_type: 3
-  stop_type: 4
+  origin_type: 121
+  focus_type: 122
+  stop_type: 123
   lr: 1e-4
   draw_random_samples: 0
   name: gap_relenergy

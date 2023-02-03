@@ -1,0 +1,18 @@
+_target_: schnetpack_gschnet.data.GenerativeAtomsDataModule
+
+data_workdir: ${globals.data_workdir}  # is specified in yaml-file of the experiment
+placement_cutoff: ${globals.placement_cutoff}
+use_covalent_radii: ${globals.use_covalent_radii}
+covalent_radius_factor: ${globals.covalent_radius_factor}
+num_workers: 8
+num_val_workers: 4
+num_test_workers: 4
+
+datapath: ???
+batch_size: ???
+num_train: ???
+num_val: ???
+
+# convert to typically used units
+distance_unit: ???
+

@@ -1,0 +1,66 @@
+# @package _global_
+
+defaults:
+  - override /data: template
+  - override /task: gschnet_task
+  - override /callbacks:
+      - checkpoint
+      - earlystopping
+      - lrmonitor
+      - progressbar
+      - modelsummary
+  - override /model: gschnet
+  - override /model/conditioning: null
+
+run:
+  path: ${run.work_dir}/models/${globals.name}
+  id: ${globals.id}
+
+globals:
+  name: ???
+  id: ???
+  model_cutoff: ???
+  prediction_cutoff: ???
+  placement_cutoff: ???
+  atom_types: ???
+  use_covalent_radii: True
+  covalent_radius_factor: 1.1
+  origin_type: 121
+  focus_type: 122
+  stop_type: 123
+  lr: 1e-4
+  draw_random_samples: 5
+  data_workdir: null
+  cache_workdir: null
+
+callbacks:
+  early_stopping:
+    patience: 25
+  progress_bar:
+    refresh_rate: 100
+  model_summary:
+    max_depth: -1
+
+data:
+  batch_size: ???
+  num_train: ???
+  num_val: ???
+  transforms:
+    - _target_: schnetpack.transform.SubtractCenterOfMass
+    - _target_: schnetpack_gschnet.transform.OrderByDistanceToOrigin
+    - _target_: schnetpack_gschnet.transform.ConditionalGSchNetNeighborList
+      model_cutoff: ${globals.model_cutoff}
+      prediction_cutoff: ${globals.prediction_cutoff}
+      placement_cutoff: ${globals.placement_cutoff}
+      environment_provider: ase
+      use_covalent_radii: ${globals.use_covalent_radii}
+      covalent_radius_factor: ${globals.covalent_radius_factor}
+    - _target_: schnetpack_gschnet.transform.BuildAtomsTrajectory
+      centered: True
+      origin_type: ${globals.origin_type}
+      focus_type: ${globals.focus_type}
+      stop_type: ${globals.stop_type}
+      draw_random_samples: ${globals.draw_random_samples}
+      sort_idx_i: False
+    - _target_: schnetpack.transform.CastTo32
+

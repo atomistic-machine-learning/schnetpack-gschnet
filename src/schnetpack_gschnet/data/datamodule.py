@@ -235,6 +235,8 @@ class GenerativeAtomsDataModule(AtomsDataModule):
                             dataset.datapath,
                             self.placement_cutoff,
                             dataset.distance_conversion,
+                            self.use_covalent_radii,
+                            self.covalent_radius_factor,
                         )
                     )
                     if not res:

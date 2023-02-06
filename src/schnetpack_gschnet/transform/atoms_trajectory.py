@@ -302,7 +302,6 @@ class BuildAtomsTrajectory(Transform):
         # each atom needs to be placed and marked as finished, therefore we have
         # 2*n_atoms steps per trajectory
         for i in range(1, 2 * n_atoms):
-
             # 1. assemble neighborhoods for the current step
             # if a new atom was placed in the last step, add it to the neighborhood
             if next_atom != -1:

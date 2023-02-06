@@ -29,7 +29,6 @@ OmegaConf.register_new_resolver("tmpdir", tempfile.mkdtemp, use_cache=True)
 
 @hydra.main(config_path="configs", config_name="generate_molecules", version_base="1.2")
 def generate(config: DictConfig):
-
     # create output file where the generated molecules will be written to
     outputdir = Path("./generated_molecules")
     if config.outputfile is not None:

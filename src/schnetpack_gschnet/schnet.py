@@ -136,7 +136,6 @@ class SchNet(nn.Module):
         )
 
     def forward(self, inputs: Dict[str, torch.Tensor]):
-
         atomic_numbers = inputs[properties.Z]
         idx_i = inputs[properties.idx_i]
         idx_j = inputs[properties.idx_j]

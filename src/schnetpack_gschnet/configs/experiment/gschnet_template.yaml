@@ -17,13 +17,13 @@ run:
   id: ${globals.id}
 
 globals:
-  name: ???
-  id: ???
-  model_cutoff: ???
-  prediction_cutoff: ???
-  placement_cutoff: ???
-  atom_types: ???
-  use_covalent_radii: True
+  name: ???               # name of the experiment (parent directory of globals.id)
+  id: ???                 # name of the directory where results of the run are stored
+  model_cutoff: ???       # the cutoff applied by the model during feature extraction
+  prediction_cutoff: ???  # the cutoff to select which atoms are used for prediction
+  placement_cutoff: ???   # the cutoff to determine which atoms are neighbors of the focus
+  atom_types: ???         # list of atom types that appear in the data set
+  use_covalent_radii: True6
   covalent_radius_factor: 1.1
   origin_type: 121
   focus_type: 122
@@ -42,9 +42,6 @@ callbacks:
     max_depth: -1
 
 data:
-  batch_size: ???
-  num_train: ???
-  num_val: ???
   transforms:
     - _target_: schnetpack.transform.SubtractCenterOfMass
     - _target_: schnetpack_gschnet.transform.OrderByDistanceToOrigin
@@ -63,4 +60,3 @@ data:
       draw_random_samples: ${globals.draw_random_samples}
       sort_idx_i: False
     - _target_: schnetpack.transform.CastTo32
-

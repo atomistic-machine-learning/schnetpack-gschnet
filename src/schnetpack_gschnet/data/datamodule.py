@@ -200,7 +200,7 @@ class GenerativeAtomsDataModule(AtomsDataModule):
                 self.format,
                 property_units=self.property_units,
                 distance_unit=self.distance_unit,
-                load_properties=["energy_U0"],
+                load_properties=self.load_properties,
                 load_structure=True,
             )
             subset = np.ones(len(dataset), dtype=bool)

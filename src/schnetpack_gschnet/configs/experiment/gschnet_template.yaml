@@ -17,13 +17,13 @@ run:
   id: ${globals.id}
 
 globals:
-  name: ???               # name of the experiment (parent directory of globals.id)
-  id: ???                 # name of the directory where results of the run are stored
-  model_cutoff: ???       # the cutoff applied by the model during feature extraction
-  prediction_cutoff: ???  # the cutoff to select which atoms are used for prediction
-  placement_cutoff: ???   # the cutoff to determine which atoms are neighbors of the focus
-  atom_types: ???         # list of atom types that appear in the data set
-  use_covalent_radii: True6
+  name: ???                     # name of the experiment (parent directory of globals.id)
+  id: ???                       # name of the directory where results of the run are stored
+  model_cutoff: ???             # the cutoff applied by the model during feature extraction
+  prediction_cutoff: ???        # the cutoff to select which atoms are used for prediction
+  placement_cutoff: ???         # the cutoff to determine which atoms are neighbors of the focus
+  atom_types: ???               # list of atom types that appear in the data set
+  use_covalent_radii: True
   covalent_radius_factor: 1.1
   origin_type: 121
   focus_type: 122

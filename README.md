@@ -6,7 +6,7 @@
 It can be trained on data sets of 3d molecules with variable sizes and compositions.
 The conditional version, [cG-SchNet](https://www.nature.com/articles/s41467-022-28526-y), explicitly takes chemical and structural properties into account to allow for targeted molecule generation.
 
-Here we provide a re-implementation of [cG-SchNet](https://github.com/atomistic-machine-learning/G-SchNet) using the updated [SchNetPack 2.0](https://github.com/atomistic-machine-learning/schnetpack/tree/dev).
+Here we provide a re-implementation of [cG-SchNet](https://github.com/atomistic-machine-learning/G-SchNet) using the updated [SchNetPack 2.0](https://github.com/atomistic-machine-learning/schnetpack/tree/master).
 Compared to previous releases, SchNetPack changed from batching molecules to batching atoms, effectively removing the need for padding the neural network inputs.
 G-SchNet greatly benefits from this change in terms of memory requirements, allowing to train models of the same expressivity on GPUs with less VRAM.
 
@@ -45,7 +45,7 @@ pip install ./schnetpack-gschnet
 
 # Command-line interface and configuration
 
-The `schnetpack-gschnet` package is built on top of `schnetpack` [version 2.0](https://github.com/atomistic-machine-learning/schnetpack/tree/dev), which is a library for atomistic neural networks with flexible customization and configuration of models and experiments.
+The `schnetpack-gschnet` package is built on top of `schnetpack` [version 2.0](https://github.com/atomistic-machine-learning/schnetpack/tree/master), which is a library for atomistic neural networks with flexible customization and configuration of models and experiments.
 It is integrated with the [PyTorch Lightning](https://www.pytorchlightning.ai/) learning framework, which takes care of the boilerplate code required for training and provides a standardized, modular interface for incorporating learning tasks and data sets.
 Moreover, SchNetPack utilizes the hierarchical configuration framework [Hydra](https://hydra.cc/).
 This allows to define training runs using YAML config files that can be loaded, composed, and overridden via a powerful command-line interface (CLI).
@@ -60,9 +60,8 @@ We recommend to copy the configs directory from `schnetpack-gschnet` to create a
 cp -r <path/to/schnetpack-gschnet>/src/schnetpack_gschnet/configs/. <path/to/my_gschnet_configs>
 ```
 
-Here you can customize the existing configs or create new ones, e.g. to train cG-SchNet with custom conditions.
+You can customize the existing configs or create new ones in that directory, e.g. to set up training of cG-SchNet with custom conditions.
 All hyperparameters specified in the YAML files can also directly be set in the CLI when calling the training or generation script.
-For example, the number of training data points can be set to 100 with the argument `data.num_train=100`.
 We will explain the most important hyperparameters and config files in the following sections on training and molecule generation.
 For more details on the strucure of the config, the CLI, and the PyTorch Lightning integration, please refer to the [software paper](https://arxiv.org/abs/2212.05517) for SchNetPack 2.0 and the [documentation](https://schnetpack.readthedocs.io/en/latest/) of the package.
 
@@ -258,7 +257,7 @@ Also, note our hints on scaling up the training in the following section if your
 
 The QM9 data set, which is used in the example experiments, contains only small organic compounds.
 Therefore, the default settings in those configs might lead to excessive memory and runtime requirements when using other data sets.
-In the following, we shed light on the most important settings and tweaks to use cG-SchNet with molecules much larger than those in QM9.
+In the following, we shed light on the most important settings and tweaks to use G-SchNet with molecules much larger than those in QM9.
 
 #### 1. Set draw_random_samples > 0
 
@@ -283,7 +282,7 @@ A very small prediction cutoff might hurt the performance of the model.
 The model cutoff determines the neighbors that exchange messages when extracting atom-wise features from the molecular structure.
 A large model cutoff can be interpreted as increasing the receptive field of an atom but comes with higher computational costs.
 From our experience, we recommend to set both cutoffs to similar values.
-The corresponding config settings are `globals.prediction_cutoff` and globals.model_cutoff`.
+The corresponding config settings are `globals.prediction_cutoff` and `globals.model_cutoff`.
 For QM9, we use 10 Angstrom, which should also be a reasonable starting point for other data sets.
 
 #### 3. Use caching of neighborlists

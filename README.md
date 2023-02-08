@@ -208,14 +208,18 @@ for i in range(n_molecules):
     mol_list.append(mol)
     # create dictionary that maps property names to property values and append it to the list
     # note that the property values need to be numpy float arrays (even if they are scalar values)
-    properties = {"energy": np.array([float(property_values[0])]), "gap": np.array([float(property_values[1])])}
+    properties = {
+        "energy": np.array([float(property_values[0])]), 
+        "gap": np.array([float(property_values[1])]),
+        }
     property_list.append(properties)
 
-# create empty data base with correct format, make sure to provide the correct units of the positions and properties
+# create empty data base with correct format
+# make sure to provide the correct units of the positions and properties
 custom_dataset = ASEAtomsData.create(
-    "/home/user/custom_dataset.db",                                # choose where to store the data base
-    distance_unit="Angstrom",                                      # unit of positions
-    property_unit_dict={"energy": "Hartree", "gap": "Hartree"}     # units of properties
+    "/home/user/custom_dataset.db",                              # where to store the data base
+    distance_unit="Angstrom",                                    # unit of positions
+    property_unit_dict={"energy": "Hartree", "gap": "Hartree"},  # units of properties
 )
 # write gathered molecules and their properties to the data base
 custom_dataset.add_systems(property_list, mol_list)

@@ -211,7 +211,7 @@ for i in range(n_molecules):
     properties = {
         "energy": np.array([float(property_values[0])]), 
         "gap": np.array([float(property_values[1])]),
-        }
+    }
     property_list.append(properties)
 
 # create empty data base with correct format

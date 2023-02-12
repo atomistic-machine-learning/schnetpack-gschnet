@@ -323,19 +323,45 @@ They are automatically deleted if the run finishes without errors.
 
 ## Molecule generation
 
-After training an unconditioned model, you can generate 10 molecules as follows:
+After training a model, you can generate molecules from the CLI with the generation script:
 
 ```
-python <schnetpack-gschnet/path>/src/scripts/generate.py --config-dir=<schnetpack-gschnet/path>/src/schnetpack_gschnet/configs model_dir=<path to trained model> generate.n_molecules=10
+python <path/to/schnetpack-gschnet>/src/scripts/generate.py --config-dir=<path/to/my_gschnet_configs> model_dir=<path/to/trained/model>
 ```
 
-For conditioned models, target values for all conditional properties need to be specified for generation (for example, see configs in `<schnetpack-gschnet/path>/src/schnetpack_gschnet/configs/conditions`), e.g. for a model conditioned on HOMO-LUMO gap and relative atomic energy:
+The call to the generation script requires two arguments, the directory with configs from `schnetpack-gschnet` and the path to the root directory of the trained model, i.e. the directory containing the files _best\_model_, _cli.log_, _config.yaml_ etc.
+The generated molecules are stored in an `ASE` data base at `<model_dir>/generated_molecules/`.
+For models trained with conditions, target values for all properties that were used have to be specified.
+For example, for a model trained with the `gschnet_qm9_gap_relenergy` config, both a target HOMO-LUMO gap and relative atomic energy have to be set.
+This can be done by appending the following arguments to the CLI call:
 
 ```
-python <schnetpack-gschnet/path>/src/scripts/generate.py --config-dir=<schnetpack-gschnet/path>/src/schnetpack_gschnet/configs model_dir=<path to trained model> conditions=gap_relenergy generate.n_molecules=10
++generate.conditions.gap=4.0 +generate.conditions.relative_atomic_energy=-0.2
 ```
 
-The available parameters (e.g. batch size, maximum number of atoms etc.) can be found in `<schnetpack-gschnet/path>/src/schnetpack_gschnet/configs/generate.yaml`.
+Here the `+` is needed to append new arguments to the config (as opposed to setting new values for existing config entries).
+Alternatively, you can create a config file for the target property values at `<path/to/my_gschnet_configs>/generate/conditions/my_conditions.yaml` and append it to the config by adding `generate/conditions=my_conditions` to the CLI call.
+The package contains two [exemplary target value config files](/src/schnetpack_gschnet/configs/generate/conditions) that cover the two cG-SchNet example experiments using the target values from the corresponding experiments in the publication.
+Note that the names of the target properties have to correspond to the `condition_name` specified in the conditioning configs of the trained model.
+That is why we use _gap_ and _relative\_atomic\_energy_ here, as specified in lines 6 and 15 of the [conditioning config](/src/schnetpack_gschnet/configs/model/conditioning/gap_relenergy.yaml).
+In models conditioned on the atomic composition, the corresponding property name is automatically set to _composition_.
+
+In the following table, we list all settings for the generation script and their default values.
+All settings can directly be set in the CLI, e.g. add `generate.n_molecules=1000` to the call to generate a thousand instead of a hundred molecules.
+
+| Name | Value | Description |
+| :--- | :--- | :--- |
+| `generate.n_molecules` | `100` | The number of molecules that shall be generated. Note that the number of molecules in the resulting data base can be lower as failed generation attempts are not stored, i.e. where the model has not finished generation after placing `max_n_atoms` atoms. |
+| `generate.batch_size` | `10` | The number of molecules generated in one batch. Use large batches if possible and decrease the batch size if your GPU runs out of memory. |
+| `generate.max_n_atoms` | `35` | The maximum number of atoms the model is allowed to place. If it has not finished after placing this many atoms, it will discard the structure as a failed generation attempt. |
+| `generate.grid_distance_min` | `0.7` | The minimum distance between a new atom and the focus atom. Determines the extent of the 3d grid together with the `placement_cutoff` used during model training, which sets the maximum distance between new atom and focus. |
+| `generate.grid_spacing` | `0.05` | The size of a bin in the 3d grid (i.e. a value of 0.05 means each bin has a size of 0.05x0.05x0.05). |
+| `generate.temperature_term` | `0.1` | The temperature term in the normalization of the 3d grid probability. A smaller value leads to more pronounced peaks whereas a larger value increases randomness by smoothing the distribution. |
+| `generate.grid_batch_size` | `-1` | For the reconstruction of the positional distributions, one 3d grid is constructed for every preceding atom (within the `prediction cutoff` of the model). This operation consumes a lot of memory and therefore is a bottleneck when it comes to the number of molecules that can be generated at the same time. When setting this argument to an integer `x`, at most `x` 3d grids are constructed at the same time, which allows to control the memory demand of the generation process. The default value of `-1` means that all grids are computed at once. |
+| `outputfile` | `null` | Name of the data base where generated molecules are stored. The data base will always be stored at `<path/to/trained/model>/generated_molecules/`. If `null`, the script will automatically assign a number to the data base (it starts to count from 1 and increases the count by one if a data base with the number already exists). |
+| `use_gpu` | `True` | Set `True` to run generation on the GPU. |
+| `view_molecules` | `False` | Set `True` to automatically open a pop-up window with visualizations of all generated structures (use the `ASE` package for visualization). |
+| `workdir` | `null` | If not `null`, the data base will first be written to this path and then copied to `<path/to/trained/model>/generated_molecules/`. Note: the version at `workdir` is not automatically deleted. |
 
 # Additional information
 

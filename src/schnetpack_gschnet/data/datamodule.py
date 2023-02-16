@@ -301,6 +301,10 @@ class GenerativeAtomsDataModule(AtomsDataModule):
 
         # split dataset
         if self.split_file is not None and os.path.exists(self.split_file):
+            logging.info(
+                f"Loading splits for training, validation and testing "
+                f"from existing split file at {self.split_file}."
+            )
             S = np.load(self.split_file)
             self.train_idx = S["train_idx"].tolist()
             self.val_idx = S["val_idx"].tolist()

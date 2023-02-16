@@ -18,7 +18,7 @@ def generate_molecules(
     conditions: dict,
     device: torch.device,
     t: float = 0.1,
-    grid_batch_size: float = -1,
+    grid_batch_size: float = 0,
 ):
     """
     Generate a batch of molecules.
@@ -48,7 +48,7 @@ def generate_molecules(
             decrease randomness (by making the distribution flatter or more peaky,
             respectively).
         grid_batch_size: Determines for how many already placed atoms the 3d grid
-            probability is computed at the same time. Set to -1 to compute for all atoms
+            probability is computed at the same time. Set to 0 to compute for all atoms
             at once.
             Since the computation of many 3d grids at once requires a lot of memory,
             it is a bottleneck to the total number of molecules that can be generated
@@ -305,7 +305,7 @@ def generate_molecules(
         # require a lot of memory, this can help to speed up computations by allowing
         # larger batches of molecules for generation, i.e. the memory demands of the
         # model forward pass and the computations on the grid are aligned)
-        if grid_batch_size == -1:
+        if grid_batch_size <= 0:
             n_batches = 1
         else:
             n_batches = math.ceil(len(idx_m) / grid_batch_size)

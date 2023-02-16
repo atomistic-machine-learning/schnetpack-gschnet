@@ -8,4 +8,4 @@ max_n_atoms: 35
 grid_distance_min: 0.7
 grid_spacing: 0.05
 temperature_term: 0.1
-grid_batch_size: -1
+grid_batch_size: 0

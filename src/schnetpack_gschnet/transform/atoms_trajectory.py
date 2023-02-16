@@ -276,7 +276,7 @@ class BuildAtomsTrajectory(Transform):
 
         # if the placement of the first atom is part of the training data, put this step
         # into the data structures
-        if self.draw_random_samples == 0 or 0 in random_steps:
+        if self.draw_random_samples <= 0 or 0 in random_steps:
             new_R += [R_ordered[:2]]
             new_Z += [Z_ordered[:2]]
             new_idx_i += [focus_idx_i]
@@ -400,7 +400,7 @@ class BuildAtomsTrajectory(Transform):
 
             # 3. prepare data of this step for inputs dictionary (if the step shall
             # be used in the training)
-            if self.draw_random_samples == 0 or i in random_steps:
+            if self.draw_random_samples <= 0 or i in random_steps:
                 n_steps = len(new_n_atoms)  # number of steps before adding this one
                 new_R += [R[None, cur_focus], R_ordered[1 : n_placed + 2]]
                 new_Z += [Z_ordered[: n_placed + 2]]
@@ -482,7 +482,7 @@ class BuildAtomsTrajectory(Transform):
         inputs[properties.n_pred_nbh] = torch.tensor(n_pred_nbh, dtype=torch.long)
         inputs[properties.pred_r_ij] = torch.cat(pred_dists, dim=0)
         inputs[properties.pred_r_ij_idcs] = torch.cat(pred_dists_idx, dim=0)
-        if self.draw_random_samples == 0:
+        if self.draw_random_samples <= 0:
             # all prediction steps included
             inputs[properties.pred_Z] = pred_types
         else:

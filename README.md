@@ -326,11 +326,11 @@ They are automatically deleted if the run finishes without errors.
 After training a model, you can generate molecules from the CLI with the generation script:
 
 ```
-python <path/to/schnetpack-gschnet>/src/scripts/generate.py --config-dir=<path/to/my_gschnet_configs> model_dir=<path/to/trained/model>
+python <path/to/schnetpack-gschnet>/src/scripts/generate.py --config-dir=<path/to/my_gschnet_configs> modeldir=<path/to/trained/model>
 ```
 
 The call to the generation script requires two arguments, the directory with configs from `schnetpack-gschnet` and the path to the root directory of the trained model, i.e. the directory containing the files _best\_model_, _cli.log_, _config.yaml_ etc.
-The generated molecules are stored in an `ASE` data base at `<model_dir>/generated_molecules/`.
+The generated molecules are stored in an `ASE` data base at `<modeldir>/generated_molecules/`.
 For models trained with conditions, target values for all properties that were used have to be specified.
 For example, for a model trained with the `gschnet_qm9_gap_relenergy` config, both a target HOMO-LUMO gap and relative atomic energy have to be set.
 This can be done by appending the following arguments to the CLI call:

@@ -307,12 +307,14 @@ def generate_molecules(
         # model forward pass and the computations on the grid are aligned)
         if grid_batch_size <= 0:
             n_batches = 1
+            atoms_per_grid_batch = len(idx_m)
         else:
             n_batches = math.ceil(len(idx_m) / grid_batch_size)
+            atoms_per_grid_batch = grid_batch_size
         log_p_mol = torch.zeros((len(mol_order), len(grid)), device=device)
         for b in range(n_batches):
-            start = b * grid_batch_size
-            stop = (b + 1) * grid_batch_size
+            start = b * atoms_per_grid_batch
+            stop = (b + 1) * atoms_per_grid_batch
             dists = cdists(pos[start:stop], grid)  # pairwise distances
             # map distances to bins (of distance distribution from the network output)
             bins = model.dists_to_classes(dists, in_place=True)

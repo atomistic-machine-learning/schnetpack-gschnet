@@ -7,7 +7,7 @@ import torch
 import hydra
 import numpy as np
 import re
-from omegaconf import DictConfig, OmegaConf, ListConfig
+from omegaconf import DictConfig, OmegaConf, ListConfig, open_dict
 from pathlib import Path
 from ase.db import connect
 from ase.data import chemical_symbols
@@ -74,7 +74,12 @@ def generate(config: DictConfig):
     model = torch.load("best_model", map_location=device)
 
     # parse composition (if it is included in conditions)
-    original_conditions = OmegaConf.to_container(config.settings.conditions)
+    if "conditions" not in config.generate:
+        with open_dict(config):
+            config.generate.conditions = {}
+    original_conditions = OmegaConf.to_container(
+        config.settings.conditions.trajectory, resolve=True
+    )
     config.settings.conditions = parse_composition(
         config.settings.conditions, model.get_available_atom_types().cpu().numpy()
     )

@@ -29,7 +29,7 @@ globals:
   lr: 1e-4
   draw_random_samples: 0
   name: gap_relenergy
-  id: ${oc.env:JOB_ID,${uuid:1}}_${oc.env:HOSTNAME,""}
+  id: ${oc.env:SLURM_JOBID,${uuid:1}}_${oc.env:HOSTNAME,""}
   data_workdir: null
   cache_workdir: null
 

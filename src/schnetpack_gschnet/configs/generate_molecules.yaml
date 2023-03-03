@@ -4,8 +4,9 @@ defaults:
   - _self_
 
 modeldir: ???
-workdir: null
 outputfile: null
+workdir: null
+remove_workdir: False
 
 use_gpu: True
 print_config: True

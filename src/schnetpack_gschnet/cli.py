@@ -2,6 +2,7 @@ import logging
 import uuid
 import tempfile
 import shutil
+import socket
 
 import torch
 import hydra
@@ -29,6 +30,7 @@ OmegaConf.register_new_resolver("tmpdir", tempfile.mkdtemp, use_cache=True)
 
 @hydra.main(config_path="configs", config_name="generate_molecules", version_base="1.2")
 def generate(config: DictConfig):
+    log.info(f"Running on host: {socket.gethostname()}")
     # create output file where the generated molecules will be written to
     outputdir = Path("./generated_molecules")
     if config.outputfile is not None:
@@ -48,7 +50,9 @@ def generate(config: DictConfig):
         print_config(
             config,
             resolve=False,
-            fields=("modeldir", "workdir", "generate"),
+            fields=("modeldir", "generate")
+            if config.workdir is None
+            else ("modeldir", "workdir", "remove_workdir", "generate"),
         )
 
     with connect(outputfile) as con:
@@ -62,7 +66,9 @@ def generate(config: DictConfig):
 
     original_outputfile = outputfile
     if config.workdir is not None:
-        outputfile = shutil.copy(original_outputfile, Path(config.workdir))
+        workdir = Path(config.workdir)
+        workdir.mkdir(parents=True, exist_ok=True)
+        outputfile = shutil.copy(original_outputfile, workdir)
 
     # choose device (gpu or cpu)
     if config.use_gpu:
@@ -158,6 +164,8 @@ def generate(config: DictConfig):
         con.metadata = md
     if config.workdir is not None:
         shutil.copy(outputfile, original_outputfile)
+        if config.remove_workdir:
+            shutil.rmtree(workdir)
 
     log.info(
         f"Finished generation. Wrote {n_new_mols} successfully generated molecules to "

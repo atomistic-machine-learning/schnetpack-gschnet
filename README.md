@@ -360,8 +360,9 @@ All settings can directly be set in the CLI, e.g. add `generate.n_molecules=1000
 | `generate.grid_batch_size` | `0` | For the reconstruction of the positional distributions, one 3d grid is constructed for every preceding atom (within the `prediction cutoff` of the model). This operation consumes a lot of memory and therefore is a bottleneck when it comes to the number of molecules that can be generated at the same time. When setting this argument to an integer `x > 0`, at most `x` 3d grids are constructed at the same time, which allows to control the memory demand of the generation process. The default value of `0` means that all grids are computed at once. |
 | `outputfile` | `null` | Name of the data base where generated molecules are stored. The data base will always be stored at `<path/to/trained/model>/generated_molecules/`. If `null`, the script will automatically assign a number to the data base (it starts to count from 1 and increases the count by one if a data base with the number already exists). |
 | `use_gpu` | `True` | Set `True` to run generation on the GPU. |
-| `view_molecules` | `False` | Set `True` to automatically open a pop-up window with visualizations of all generated structures (use the `ASE` package for visualization). |
-| `workdir` | `null` | If not `null`, the data base will first be written to this path and then copied to `<path/to/trained/model>/generated_molecules/`. Note: the version at `workdir` is not automatically deleted. |
+| `view_molecules` | `False` | Set `True` to automatically open a pop-up window with visualizations of all generated structures (uses the `ASE` package for visualization). |
+| `workdir` | `null` | Path to a directory. If not `null`, the data base will first be written to this directory and then copied to `<path/to/trained/model>/generated_molecules/`. This can speed up the generation if the storage of `<path/to/trained/model>` is slow, e.g. a shared drive on a cluster, and `workdir` is on a fast local storage. If the directory does not exist, it will be created automatically. |
+| `remove_workdir` | `False` | If `True`, the `workdir` is automatically removed after the data base has been copied to `<path/to/trained/model>/generated_molecules`. |
 
 # Additional information
 

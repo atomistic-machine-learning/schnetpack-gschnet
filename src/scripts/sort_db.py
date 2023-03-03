@@ -21,7 +21,7 @@ def get_parser():
         action="store_true",
     )
     parser.add_argument(
-        "--write_mol_dict", help="Write a mol_dict_file", action="store_true"
+        "--write_mol_dict", help="Write a mol_dict file", action="store_true"
     )
     parser.add_argument(
         "--atom_types", help="Atom types used to sort db", default=[6, 7, 8, 9, 1]

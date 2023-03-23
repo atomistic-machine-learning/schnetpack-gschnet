@@ -216,11 +216,17 @@ class BuildAtomsTrajectory(Transform):
         # randomly draw which steps from the trajectory are used for training
         random_steps = set()
         if self.draw_random_samples > 0:
-            random_steps = torch.multinomial(
-                torch.ones(n_atoms * 2), self.draw_random_samples, replacement=False
-            )
-            ordered_steps = random_steps.sort()[0]
-            random_steps = set(random_steps.numpy())
+            if n_atoms * 2 > self.draw_random_samples:
+                random_steps = torch.multinomial(
+                    torch.ones(n_atoms * 2), self.draw_random_samples, replacement=False
+                )
+                ordered_steps = random_steps.sort()[0]
+                random_steps = set(random_steps.numpy())
+            else:
+                # the molecule is smaller than the number of steps we want to draw
+                # therefore we can just use all steps
+                ordered_steps = torch.arange(n_atoms * 2)
+                random_steps = set(ordered_steps.numpy())
 
         # now that we have a complete molecule, a trajectory in which it can be built
         # and a list of steps in this trajectory the we want to use for training, we

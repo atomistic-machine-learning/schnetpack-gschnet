@@ -56,6 +56,7 @@ class GenerativeAtomsDataModule(AtomsDataModule):
         num_workers: int = 8,
         num_val_workers: Optional[int] = None,
         num_test_workers: Optional[int] = None,
+        num_preprocessing_workers: Optional[int] = None,
         property_units: Optional[Dict[str, str]] = None,
         distance_unit: Optional[str] = None,
         data_workdir: Optional[str] = None,
@@ -99,6 +100,8 @@ class GenerativeAtomsDataModule(AtomsDataModule):
                 num_workers).
             num_test_workers: Number of test data loader workers (overrides
                 num_workers).
+            num_preprocessing_workers: Number of workers for one-time preprocessing
+                during data setup (overrides num_workers).
             property_units: Dictionary from property to corresponding unit as a
                 string (eV, kcal/mol, ...).
             distance_unit: Unit of the atom positions and cell as a string (Ang,
@@ -144,6 +147,7 @@ class GenerativeAtomsDataModule(AtomsDataModule):
         self.covalent_radius_factor = covalent_radius_factor
         self.subset_idx = None
         self.registered_properties = None
+        self.num_preprocessing_workers = num_preprocessing_workers or self.num_workers
 
     def setup(self, stage: Optional[str] = None):
         if self.trainer.ckpt_path is not None and stage != "load_checkpoint":
@@ -204,15 +208,10 @@ class GenerativeAtomsDataModule(AtomsDataModule):
                 load_structure=True,
             )
             subset = np.ones(len(dataset), dtype=bool)
-            # check connectivity in multiple threads if multiple workers are available
-            n_workers = (
-                self.num_workers
-                + (self.num_val_workers or 0)
-                + (self.num_test_workers or 0)
-            )
-            if n_workers > 0:
-                cutoffs = [self.placement_cutoff] * len(dataset)
+            # check connectivity (in multiple threads if multiple workers are available)
+            if self.num_preprocessing_workers > 0:
                 datapaths = [dataset.datapath] * len(dataset)
+                cutoffs = [self.placement_cutoff] * len(dataset)
                 conversions = [dataset.distance_conversion] * len(dataset)
                 use_covalent_radii = [self.use_covalent_radii] * len(dataset)
                 cv_factor = [self.covalent_radius_factor] * len(dataset)
@@ -220,7 +219,7 @@ class GenerativeAtomsDataModule(AtomsDataModule):
                 arguments = zip(
                     idcs, datapaths, cutoffs, conversions, use_covalent_radii, cv_factor
                 )
-                with Pool(n_workers) as p:
+                with Pool(self.num_preprocessing_workers) as p:
                     for res in tqdm(
                         p.imap_unordered(check_connectivity, arguments),
                         total=len(dataset),

@@ -27,6 +27,7 @@ For reproduction of the results reported in our publications, please refer to th
     + [Scaling up the training](/README.md#scaling-up-the-training)
   + [Molecule generation](/README.md#molecule-generation)
 + [Additional information](/README.md#additional-information)
+  + [Known issues and troubleshooting](/README.md#known-issues-and-troubleshooting)
   + [Changes in this implementation](/README.md#changes-in-this-implementation)
   + [Citation](/README.md#citation)
   + [How does cG-SchNet work?](/README.md#how-does-cg-schnet-work)
@@ -366,7 +367,12 @@ All settings can directly be set in the CLI, e.g. add `generate.n_molecules=1000
 
 # Additional information
 
-### Changes in this implementation
+## Known issues and troubleshooting
+
+### Data preprocessing is getting stuck or crashing
+We use multi-processing to speed up the data setup phase before training starts. On some machines, this can lead to [the process getting stuck](https://github.com/atomistic-machine-learning/schnetpack-gschnet/issues/3) or [crashes with error messages related to pickle](https://github.com/atomistic-machine-learning/cG-SchNet/issues/3). To circumvent this problem, multi-processing can be deactivated for the data setup by appending `+data.num_preprocessing_workers=0` to the training call. This will lead to slightly longer preprocessing times, e.g. 4 minutes instead of 1 minute on QM9 using a modern CPU. However, this is not a big harm as the data setup only needs to be done once prior to training. Note that the regular, repeated data loading is not impacted by this setting and can still run in parallel (it is configured with `data.num_workers`). 
+
+## Changes in this implementation
 
 Compared to previous implementations of G-SchNet, we improved the scalability and simplified the adaptation to custom data sets.
 The changes we made mainly concern the preparation of data and the reconstruction of the 3d positional distribution.
@@ -375,7 +381,7 @@ The changes we made mainly concern the preparation of data and the reconstructio
 
 Accordingly, in comparison to previous implementations where G-SchNet had only a single _model cutoff_ that determined which atoms are exchanging messages in the SchNet interaction blocks, this version has three cutoffs as hyperparameters, namely the _model cutoff_, the _prediction cutoff_, and the _placement cutoff_.
 
-### Citation
+## Citation
 
 If you use G-SchNet in your research, please cite the corresponding publications:
 
@@ -414,7 +420,7 @@ K.T. Schütt, S.S.P. Hessmann, N.W.A. Gebauer, J. Lederer, and M. Gastegger. _Sc
       year={2022}
     }
 
-### How does cG-SchNet work?
+## How does cG-SchNet work?
 
 cG-SchNet is an autoregressive neural network.
 It builds 3d molecules by placing one atom after another in 3d space.

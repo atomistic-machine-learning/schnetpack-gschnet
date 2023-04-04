@@ -147,7 +147,9 @@ class GenerativeAtomsDataModule(AtomsDataModule):
         self.covalent_radius_factor = covalent_radius_factor
         self.subset_idx = None
         self.registered_properties = None
-        self.num_preprocessing_workers = num_preprocessing_workers or self.num_workers
+        self.num_preprocessing_workers = self.num_workers
+        if num_preprocessing_workers is not None:
+            self.num_preprocessing_workers = num_preprocessing_workers
 
     def setup(self, stage: Optional[str] = None):
         if self.trainer.ckpt_path is not None and stage != "load_checkpoint":

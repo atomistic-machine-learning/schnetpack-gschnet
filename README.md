@@ -27,7 +27,7 @@ For reproduction of the results reported in our publications, please refer to th
     + [Scaling up the training](/README.md#scaling-up-the-training)
   + [Molecule generation](/README.md#molecule-generation)
 + [Additional information](/README.md#additional-information)
-  + [Known issues and troubleshooting](/README.md#known-issues-and-troubleshooting)
+  + [FAQ and troubleshooting](/README.md#faq-and-troubleshooting)
   + [Changes in this implementation](/README.md#changes-in-this-implementation)
   + [Citation](/README.md#citation)
   + [How does cG-SchNet work?](/README.md#how-does-cg-schnet-work)
@@ -367,10 +367,21 @@ All settings can directly be set in the CLI, e.g. add `generate.n_molecules=1000
 
 # Additional information
 
-## Known issues and troubleshooting
+## FAQ and troubleshooting
 
-### Data preprocessing is getting stuck or crashing
-We use multi-processing to speed up the data setup phase before training starts. On some machines, this can lead to [the process getting stuck](https://github.com/atomistic-machine-learning/schnetpack-gschnet/issues/3) or [crashes with error messages related to pickle](https://github.com/atomistic-machine-learning/cG-SchNet/issues/3). To circumvent this problem, multi-processing can be deactivated for the data setup by appending `+data.num_preprocessing_workers=0` to the training call. This will lead to slightly longer preprocessing times, e.g. 4 minutes instead of 1 minute on QM9 using a modern CPU. However, this is not a big harm as the data setup only needs to be done once prior to training. Note that the regular, repeated data loading is not impacted by this setting and can still run in parallel (it is configured with `data.num_workers`). 
+### 1. Can I restart training after a run crashed or timed out?
+Yes, if you start a run with an existing `run.id`, the training will automatically be resumed from the last stored checkpoint.
+The `run.id` is the name of the folder where the model, logs, config etc. of a run are stored.
+In our example configs, `run.id` is automatically set to a unique identifier if you do not provide it manually.
+Accordingly, every time a run is started, a new folder is created and a new model is trained.
+However, if you set `run.id=<your_name>` in your CLI call the training will be resumed if there already exists a folder called `<your_name>` (otherwise, a fresh run with that name will be initialized). 
+
+### 2. Data preprocessing is getting stuck or crashing
+We use multi-processing to speed up the data setup phase before training starts.
+On some machines, this can lead to [the process getting stuck](https://github.com/atomistic-machine-learning/schnetpack-gschnet/issues/3) or [crashes with error messages related to pickle](https://github.com/atomistic-machine-learning/cG-SchNet/issues/3).
+To circumvent this problem, multi-processing can be deactivated for the data setup by appending `+data.num_preprocessing_workers=0` to the training call.
+This will lead to slightly longer preprocessing times, e.g. 4 minutes instead of 1 minute on QM9 using a modern CPU. However, this is not a big harm as the data setup only needs to be done once prior to training.
+Note that the regular, repeated data loading is not impacted by this setting and can still run in parallel (it is configured with `data.num_workers`).
 
 ## Changes in this implementation
 

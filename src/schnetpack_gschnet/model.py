@@ -57,6 +57,7 @@ class ConditionalGenerativeSchNet(AtomisticModel):
         input_dtype_str: str = "float32",
         do_postprocessing: bool = False,
         average_type_distributions: bool = False,
+        input_modules: List[nn.Module] = None,
     ):
         """
         Args:
@@ -116,6 +117,8 @@ class ConditionalGenerativeSchNet(AtomisticModel):
                 element-wise and then normalized by taking the softmax again, which
                 leads to sharper distributions compared to the averaging, i.e. it
                 further suppresses small probabilities and increases large ones.
+            input_modules: Modules that are applied before representation, e.g. to
+                modify input or add additional tensors for response properties.
         """
         super().__init__(
             postprocessors=postprocessors,
@@ -195,7 +198,12 @@ class ConditionalGenerativeSchNet(AtomisticModel):
         self.collect_derivatives()
         self.average_type_distributions = average_type_distributions
 
+        self.input_modules = nn.ModuleList(input_modules)
+
     def forward(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
+        # apply input modules
+        for m in self.input_modules:
+            inputs = m(inputs)
         # extract atom-wise features from placed atoms
         inputs = self.extract_atom_wise_features(inputs)
         # extract conditioning features from the conditions

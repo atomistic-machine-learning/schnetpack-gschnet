@@ -83,6 +83,7 @@ class QM9Gen(GenerativeAtomsDataModule):
         num_workers: int = 4,
         num_val_workers: Optional[int] = None,
         num_test_workers: Optional[int] = None,
+        num_preprocessing_workers: Optional[int] = None,
         property_units: Optional[Dict[str, str]] = None,
         distance_unit: Optional[str] = None,
         data_workdir: Optional[str] = None,
@@ -127,6 +128,8 @@ class QM9Gen(GenerativeAtomsDataModule):
                 num_workers).
             num_test_workers: Number of test data loader workers (overrides
                 num_workers).
+            num_preprocessing_workers: Number of workers for one-time preprocessing
+                during data setup (overrides num_workers).
             property_units: Dictionary from property to corresponding unit as a
                 string (eV, kcal/mol, ...).
             distance_unit: Unit of the atom positions and cell as a
@@ -161,6 +164,7 @@ class QM9Gen(GenerativeAtomsDataModule):
             num_workers=num_workers,
             num_val_workers=num_val_workers,
             num_test_workers=num_test_workers,
+            num_preprocessing_workers=num_preprocessing_workers,
             property_units=property_units,
             distance_unit=distance_unit,
             data_workdir=data_workdir,

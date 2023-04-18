@@ -52,7 +52,7 @@ data:
       model_cutoff: ${globals.model_cutoff}
       prediction_cutoff: ${globals.prediction_cutoff}
       placement_cutoff: ${globals.placement_cutoff}
-      environment_provider: ase
+      environment_provider: matscipy
       use_covalent_radii: ${globals.use_covalent_radii}
       covalent_radius_factor: ${globals.covalent_radius_factor}
     - _target_: schnetpack_gschnet.transform.BuildAtomsTrajectory

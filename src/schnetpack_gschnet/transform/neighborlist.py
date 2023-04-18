@@ -9,6 +9,7 @@ import logging
 import torch
 from ase import Atoms
 from ase.neighborlist import neighbor_list
+from matscipy.neighbours import neighbour_list as msp_neighbor_list
 from ase.data import covalent_radii
 from schnetpack.transform.base import Transform
 import fasteners
@@ -166,7 +167,7 @@ class ConditionalGSchNetNeighborList(Transform):
         model_cutoff: float,
         prediction_cutoff: float,
         placement_cutoff: float,
-        environment_provider: str = "ase",
+        environment_provider: str = "matscipy",
         use_covalent_radii: bool = True,
         covalent_radius_factor: float = 1.1,
     ):
@@ -180,8 +181,8 @@ class ConditionalGSchNetNeighborList(Transform):
             placement_cutoff: Determines which atoms are considered to be neighbors
                 when sampling sequences of atom placements (i.e. which atoms can be
                 placed given a focus atom).
-            environment_provider: Can be either "ase" to use the ASE implementation of
-                neighbor list or "torch" to use a custom torch implementation.
+            environment_provider: Can be "matscipy", "ase", or "torch" to use the
+                matscipy, ASE, or custom torch implementation of neighbor list.
             use_covalent_radii: If True, pairs inside the placement cutoff will be
                 further filtered using the covalent radii from ase. In this way, the
                 cutoff is for example smaller for carbon-hydrogen pairs than for
@@ -196,13 +197,15 @@ class ConditionalGSchNetNeighborList(Transform):
         super().__init__()
         if environment_provider == "torch":
             nbh_class = TorchMultipleNeighborLists
-        else:
+        elif environment_provider == "ase":
             nbh_class = ASEMultipleNeighborLists
-            if environment_provider.lower() != "ase":
+        else:
+            nbh_class = MatScipyMultipleNeighborLists
+            if environment_provider.lower() != "matscipy":
                 logging.info(
                     f'The specified environment provider "{environment_provider}" '
-                    f'does not exist, please choose from "ase" and "torch". Using '
-                    f'default provider "ase" now.'
+                    f'does not exist, please choose from "matscipy", "ase", and '
+                    f'"torch". Using default provider "matscipy" now.'
                 )
         # initialize transform for computation of the neighbor lists
         self.nbh_transform = nbh_class(
@@ -348,6 +351,51 @@ class MultipleNeighborListsTransform(Transform):
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         """Override with specific neighbor list implementation"""
         raise NotImplementedError
+
+
+class MatScipyMultipleNeighborLists(MultipleNeighborListsTransform):
+    """
+    Neighborlist using the efficient implementation of the Matscipy package
+
+    References:
+        https://github.com/libAtoms/matscipy
+    """
+
+    def _build_neighbor_list(
+        self, Z, positions, cell, pbc, cutoff, eps=1e-6, buffer=0.1
+    ):
+        at = Atoms(numbers=Z, positions=positions, cell=cell, pbc=pbc)
+
+        # Add cell if none is present (if volume = 0)
+        if at.cell.volume < eps:
+            if len(Z) < 200:
+                # for small structures, the simple, potentially quadratic neighbor search is faster
+                # therefore we set a small dummy cell where many atoms are outside
+                at.set_cell([1.0, 1.0, 1.0], scale_atoms=False)
+            else:
+                # for large structures, we compute a proper cell and make sure all atoms are inside
+                # max values - min values along xyz augmented by small buffer for stability
+                new_cell = np.ptp(at.positions, axis=0) + 0.1
+                # set cell and center
+                at.set_cell(new_cell, scale_atoms=False)
+                at.center()
+
+        # Compute neighborhood
+        _idx_i, _idx_j, S, dists = msp_neighbor_list("ijSd", at, cutoff)
+        # the results from matscipy are sorted by idx_i but the order of idx_j can be random
+        # since ordered idx_j are needed for sampling of placement trajectories, we sort
+        # them here
+        # since idx_i and idx_j are symmetric and idx_i is already sorted,
+        # we can simply sort idx_j in a stable manner and then switch idx_i and idx_j
+        idx_j = torch.from_numpy(_idx_j.astype(int))
+        _, order = torch.sort(idx_j, stable=True)
+        idx_i = idx_j[order]
+        idx_j = torch.from_numpy(_idx_i.astype(int))[order]
+        # flip the shift vectors since we flipped i and j
+        S = torch.from_numpy(-S).to(dtype=positions.dtype)[order]
+        offset = torch.mm(S, cell)
+        dists = torch.from_numpy(dists[order])
+        return idx_i, idx_j, offset, dists
 
 
 class ASEMultipleNeighborLists(MultipleNeighborListsTransform):

@@ -23,7 +23,7 @@ setup(
     name="schnetpack-gschnet",
     packages=find_packages("src"),
     package_dir={"": "src"},
-    version="0.1-alpha",
+    version="0.1",
     author="Niklas Gebauer",
     scripts=[],
     include_package_data=True,

@@ -10,7 +10,7 @@ def gschnet_collate_fn(batches):
     trajectories of atom placements.
 
     Args:
-        batches (list): each entry is a of (partial) molecules making up a trajectory
+        batches (list): each entry is a (partial) molecules making up a trajectory
             of atom placement steps
 
     Returns:
@@ -59,21 +59,18 @@ def gschnet_collate_fn(batches):
 
     # update idx keys which require specific offset calculations
     # 1. offset for atom-based indices
-    seg_t_atoms = torch.cumsum(atoms_per_trajectory, dim=0)
-    seg_t_atoms = torch.cat(
-        [torch.zeros((1,), dtype=seg_t_atoms.dtype), seg_t_atoms], dim=0
-    )
+    seg_t_atoms = torch.empty(len(batches) + 1, dtype=torch.long)
+    seg_t_atoms[0] = 0
+    seg_t_atoms[1:] = torch.cumsum(atoms_per_trajectory, dim=0)
     # 2. offset for molecule-based indices
-    seg_t_molecules = torch.cumsum(molecules_per_trajectory, dim=0)
-    seg_t_molecules = torch.cat(
-        [torch.zeros((1,), dtype=seg_t_molecules.dtype), seg_t_molecules], dim=0
-    )
+    seg_t_molecules = torch.empty(len(batches) + 1, dtype=torch.long)
+    seg_t_molecules[0] = 0
+    seg_t_molecules[1:] = torch.cumsum(molecules_per_trajectory, dim=0)
     # 3. offset for prediction-atom-based indices (e.g. pred_r_ij_idcs which refer to
     # pred_idx_j)
-    seg_t_pred_atoms = torch.cumsum(pred_atoms_per_trajectory, dim=0)
-    seg_t_pred_atoms = torch.cat(
-        [torch.zeros((1,), dtype=seg_t_pred_atoms.dtype), seg_t_pred_atoms], dim=0
-    )
+    seg_t_pred_atoms = torch.empty(len(batches) + 1, dtype=torch.long)
+    seg_t_pred_atoms[0] = 0
+    seg_t_pred_atoms[1:] = torch.cumsum(pred_atoms_per_trajectory, dim=0)
     for key in idx_keys:
         if key in elem.keys():
             if key == properties.pred_idx_m:

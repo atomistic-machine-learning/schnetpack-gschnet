@@ -39,7 +39,7 @@ setup(
         "h5py",
         "tqdm",
         "pyyaml",
-        "tensorboard"
+        "tensorboard",
         "pre-commit",
         "black",
     ],

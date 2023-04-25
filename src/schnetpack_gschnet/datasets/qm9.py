@@ -90,6 +90,7 @@ class QM9Gen(GenerativeAtomsDataModule):
         cleanup_workdir_stage: Optional[str] = "test",
         splitting: Optional[SplittingStrategy] = None,
         pin_memory: Optional[bool] = None,
+        force_preprocessing: Optional[bool] = False,
     ):
         """
 
@@ -142,6 +143,9 @@ class QM9Gen(GenerativeAtomsDataModule):
                 (default: RandomSplit)
             pin_memory: If true, pin memory of loaded data to GPU. Default: Will be
                 set to true, when GPUs are used.
+            force_preprocessing: If true, the list of disconnected structures is
+                re-computed (instead of taking precomputed results from the metadata
+                of the database if they exist).
         """
         super().__init__(
             datapath=datapath,
@@ -171,6 +175,7 @@ class QM9Gen(GenerativeAtomsDataModule):
             cleanup_workdir_stage=cleanup_workdir_stage,
             splitting=splitting,
             pin_memory=pin_memory,
+            force_preprocessing=force_preprocessing,
         )
 
         self.remove_uncharacterized = remove_uncharacterized

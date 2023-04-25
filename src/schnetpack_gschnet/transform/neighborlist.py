@@ -7,6 +7,8 @@ import shutil
 from dirsync import sync
 import logging
 import torch
+import numpy as np
+from collections import deque
 from ase import Atoms
 from ase.neighborlist import neighbor_list
 from matscipy.neighbours import neighbour_list as msp_neighbor_list
@@ -24,6 +26,7 @@ __all__ = [
     "ASEMultipleNeighborLists",
     "TorchMultipleNeighborLists",
     "MultipleCountNeighbors",
+    "ConnectivityCheck",
 ]
 
 
@@ -190,9 +193,8 @@ class ConditionalGSchNetNeighborList(Transform):
                 distance between them is 1. smaller than `placement_cutoff` and 2.
                 smaller than the sum of the covalent radii of the two involved atom
                 types times `covalent_radius_factor`.
-            covalent_radius_factor: Allows coarse-grained control of the covalent radius
-                criterion when assembling the placement neighborhood (see
-                `use_covalent_radii`).
+            covalent_radius_factor: Allows control of the covalent radius criterion
+                when assembling the placement neighborhood (see `use_covalent_radii`).
         """
         super().__init__()
         if environment_provider == "torch":
@@ -612,6 +614,110 @@ class MultipleCountNeighbors(Transform):
                 inputs[count_name] = n_nbh
 
         return inputs
+
+
+class ConnectivityCheck(Transform):
+    """
+    Checks whether all atoms in the molecule are connected via some path given a
+    cutoff value.
+    """
+
+    is_preprocessor: bool = True
+    is_postprocessor: bool = False
+
+    def __init__(
+        self, cutoff, use_covalent_radii, covalent_radius_factor, return_inputs=True
+    ):
+        """
+        Args:
+            cutoff: The cutoff used to compute neighbors of atoms in the molecule.
+            use_covalent_radii: If True, pairs inside the cutoff will be further
+                filtered using the covalent radii from ase. In this way, the cutoff
+                is for example smaller for carbon-hydrogen pairs than for
+                carbon-carbon pairs. Two atoms will be considered as neighbors if
+                the distance between them is 1. smaller than `placement_cutoff` and
+                2. smaller than the sum of the covalent radii of the two involved
+                atom types times `covalent_radius_factor`.
+            covalent_radius_factor: Allows control of the covalent radius criterion
+                when assembling the placement neighborhood (see `use_covalent_radii`).
+            return_inputs: If True, the result is a boolean torch tensor of length one
+                and it is written into the inputs dictionary using the key "connected".
+                If False, the result is returned as a simple boolean value.
+        """
+        super(ConnectivityCheck, self).__init__()
+        self.cutoff = cutoff
+        self.use_covalent_radii = use_covalent_radii
+        self.covalent_radius_factor = covalent_radius_factor
+        self.return_inputs = return_inputs
+
+    def forward(
+        self,
+        inputs: Dict[str, torch.Tensor],
+    ) -> Dict[str, torch.Tensor]:
+        # create ase.Atoms object
+        at = Atoms(
+            numbers=inputs[properties.Z],
+            positions=inputs[properties.R],
+            cell=inputs[properties.cell].view(3, 3),
+            pbc=inputs[properties.pbc],
+        )
+        n_atoms = len(at.numbers)
+        # Add cell if none is present (if volume = 0)
+        if at.cell.volume < 1e-6:
+            if n_atoms < 200:
+                # for small structures, the simple, potentially quadratic neighbor search is faster
+                # therefore we set a small dummy cell where many atoms are outside
+                at.set_cell([1.0, 1.0, 1.0], scale_atoms=False)
+            else:
+                # for large structures, we compute a proper cell and make sure all atoms are inside
+                # max values - min values along xyz augmented by small buffer for stability
+                new_cell = np.ptp(at.positions, axis=0) + 0.1
+                # set cell and center
+                at.set_cell(new_cell, scale_atoms=False)
+                at.center()
+
+        # Compute neighborhood
+        _idx_i, _idx_j, _r_ij = msp_neighbor_list("ijd", at, self.cutoff)
+        if self.use_covalent_radii:
+            thresh = (
+                covalent_radii[at.numbers[_idx_i]] + covalent_radii[at.numbers[_idx_j]]
+            )
+            idcs = np.nonzero(_r_ij <= (thresh * self.covalent_radius_factor))[0]
+            _idx_i = _idx_i[idcs]
+            _idx_j = _idx_j[idcs]
+        n_nbh = np.bincount(_idx_i, minlength=n_atoms)
+        # check if there are atoms without neighbors, i.e. disconnected atoms
+        if np.count_nonzero(n_nbh == 0) > 0:
+            if self.return_inputs:
+                inputs["connected"] = torch.tensor([False], dtype=torch.bool)
+                return inputs
+            else:
+                return False
+            # return False
+        # store where the neighbors in _idx_j of each center atom in _idx_i start
+        # assuming that _idx_i is ordered
+        start_idcs = np.empty(n_nbh.size + 1, dtype=int)
+        start_idcs[0] = 0
+        start_idcs[1:] = np.cumsum(n_nbh)
+        # check connectivity of atoms given the neighbor list
+        unseen = np.ones(n_atoms, dtype=bool)
+        unseen[0] = False
+        count = 1
+        queue = deque([0])
+        while queue and count < n_atoms:
+            atom = queue.popleft()
+            neighbors = _idx_j[start_idcs[atom] : start_idcs[atom + 1]]
+            for neighbor in neighbors:
+                if unseen[neighbor]:
+                    unseen[neighbor] = False
+                    count += 1
+                    queue.append(neighbor)
+        connected = count == n_atoms  # molecule is connected if we saw all atoms
+        if self.return_inputs:
+            inputs["connected"] = torch.tensor([connected], dtype=torch.bool)
+            return inputs
+        else:
+            return connected
 
 
 def sort_j_parallel(n_nbhs, j):

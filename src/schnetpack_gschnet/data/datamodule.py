@@ -9,6 +9,7 @@ from ase.db import connect
 from ase.data import covalent_radii
 from collections import deque
 from ase.neighborlist import neighbor_list
+from matscipy.neighbours import neighbour_list as msp_neighbor_list
 
 import numpy as np
 import fasteners
@@ -25,6 +26,7 @@ from schnetpack.data import (
     RandomSplit,
 )
 from schnetpack_gschnet.data import gschnet_collate_fn
+from schnetpack_gschnet.transform import ConnectivityCheck
 
 __all__ = ["GenerativeAtomsDataModule"]
 
@@ -63,6 +65,7 @@ class GenerativeAtomsDataModule(AtomsDataModule):
         cleanup_workdir_stage: Optional[str] = "test",
         splitting: Optional[SplittingStrategy] = None,
         pin_memory: Optional[bool] = None,
+        force_preprocessing: Optional[bool] = False,
     ):
         """
         Args:
@@ -114,7 +117,9 @@ class GenerativeAtomsDataModule(AtomsDataModule):
                 (default: RandomSplit)
             pin_memory: If true, pin memory of loaded data to GPU. Default: Will be
                 set to true, when GPUs are used.
-
+            force_preprocessing: If true, the list of disconnected structures is
+                re-computed (instead of taking precomputed results from the metadata
+                of the database if they exist).
         """
         super().__init__(
             datapath=datapath,
@@ -150,11 +155,9 @@ class GenerativeAtomsDataModule(AtomsDataModule):
         self.num_preprocessing_workers = self.num_workers
         if num_preprocessing_workers is not None:
             self.num_preprocessing_workers = num_preprocessing_workers
+        self.force_preprocessing = force_preprocessing
 
     def setup(self, stage: Optional[str] = None):
-        if self.trainer.ckpt_path is not None and stage != "load_checkpoint":
-            # skip setup, it will be called after restoring the checkpoint
-            return
         # check whether data needs to be copied
         if self.data_workdir is None:
             datapath = self.datapath
@@ -204,44 +207,61 @@ class GenerativeAtomsDataModule(AtomsDataModule):
             dataset = load_dataset(
                 datapath,
                 self.format,
-                property_units=self.property_units,
+                load_properties=[],
                 distance_unit=self.distance_unit,
-                load_properties=self.load_properties,
                 load_structure=True,
             )
-            subset = np.ones(len(dataset), dtype=bool)
-            # check connectivity (in multiple threads if multiple workers are available)
-            if self.num_preprocessing_workers > 0:
-                datapaths = [dataset.datapath] * len(dataset)
-                cutoffs = [self.placement_cutoff] * len(dataset)
-                conversions = [dataset.distance_conversion] * len(dataset)
-                use_covalent_radii = [self.use_covalent_radii] * len(dataset)
-                cv_factor = [self.covalent_radius_factor] * len(dataset)
-                idcs = range(len(dataset))
-                arguments = zip(
-                    idcs, datapaths, cutoffs, conversions, use_covalent_radii, cv_factor
+            # check for pre-computed disconnected structures in db metadata
+            metadata = dataset.metadata
+            if "disconnected_idx" not in metadata:
+                metadata["disconnected_idx"] = {}
+            precomputed = metadata["disconnected_idx"]
+            key = (
+                f"{self.placement_cutoff}/{self.use_covalent_radii}"
+                f"/{self.covalent_radius_factor}"
+            )
+            if key in precomputed and not self.force_preprocessing:
+                # obtain disconnected structures from metadata
+                subset = np.ones(len(dataset), dtype=bool)
+                subset[precomputed[key]] = False
+                logging.info(
+                    f"Using precomputed results stored in the metadata of the "
+                    f"database. If you want to force the re-computation of "
+                    f"disconnected structures, set force_preprocessing=True."
                 )
-                with Pool(self.num_preprocessing_workers) as p:
-                    for res in tqdm(
-                        p.imap_unordered(check_connectivity, arguments),
-                        total=len(dataset),
-                    ):
-                        if not res[0]:
-                            subset[res[1]] = False
             else:
-                for i in tqdm(range(len(dataset))):
-                    res, _ = check_connectivity(
-                        (
-                            i,
-                            dataset.datapath,
-                            self.placement_cutoff,
-                            dataset.distance_conversion,
-                            self.use_covalent_radii,
-                            self.covalent_radius_factor,
-                        )
-                    )
-                    if not res:
-                        subset[i] = False
+                # iterate over the whole dataset to find disconnected molecules
+                dataset.transforms = [
+                    ConnectivityCheck(
+                        self.placement_cutoff,
+                        self.use_covalent_radii,
+                        self.covalent_radius_factor,
+                        return_inputs=False,
+                    ),
+                ]
+                _batch_size = 100
+                preprocessing_loader = AtomsLoader(
+                    dataset,
+                    batch_size=_batch_size,
+                    num_workers=self.num_preprocessing_workers,
+                    shuffle=False,
+                    pin_memory=False,
+                    collate_fn=lambda x: x,
+                )
+                subset = np.empty(len(dataset), dtype=bool)
+                _iteration = 0
+                with tqdm(total=len(dataset)) as pbar:
+                    for connected_list in preprocessing_loader:
+                        start = _iteration * _batch_size
+                        end = start + len(connected_list)
+                        subset[start:end] = connected_list
+                        _iteration += 1
+                        pbar.update(len(connected_list))
+                # update metadata with found disconnected structures
+                disconnected_idx = np.nonzero(~subset)[0].tolist()
+                precomputed[key] = disconnected_idx
+                dataset._set_metadata(metadata)
+            # create subset without disconnected molecules
             subset_idx = np.nonzero(subset)[0].tolist()
             n_disconnected = len(dataset) - len(subset_idx)
             if n_disconnected > 0:
@@ -325,20 +345,32 @@ class GenerativeAtomsDataModule(AtomsDataModule):
                     f"Split file was given, but `num_test ({self.num_test}) != "
                     f"len(test_idx)` ({len(self.test_idx)})!"
                 )
-            if "placement_cutoff" in S:
-                if S["placement_cutoff"] != self.placement_cutoff:
+            if (
+                "placement_cutoff" in S
+                and "use_covalent_radii" in S
+                and "covalent_radius_factor" in S
+            ):
+                if (
+                    S["placement_cutoff"] != self.placement_cutoff
+                    or S["use_covalent_radii"] != self.use_covalent_radii
+                    or S["covalent_radius_factor"] != self.covalent_radius_factor
+                ):
                     raise AtomsDataModuleError(
-                        f"Split file was given, but it was created with a placement "
-                        f"cutoff of {S['placement_cutoff']} which is different from "
-                        f"the selected placement cutoff of {self.placement_cutoff}. "
-                        f"Please specify another split file, change `placement_cutoff`"
-                        f", or start with a new split."
+                        f"Split file was given, but it was created with placement_"
+                        f"cutoff={S['placement_cutoff']}, use_covalent_radii="
+                        f"{S['use_covalent_radii']}, and covalent_radius_factor="
+                        f"{S['covalent_radius_factor']}, which is different from "
+                        f"the current settings ({self.placement_cutoff}"
+                        f"/{self.use_covalent_radii}/{self.covalent_radius_factor}). "
+                        f"Please specify another split file, adjust the settings, "
+                        f"or start with a new split."
                     )
             else:
                 raise AtomsDataModuleError(
-                    "Split file was given, but it was created without "
-                    '"placement cutoff". Please specify another split file or start '
-                    "with a new split."
+                    "Split file was given, but it is missing information about "
+                    '"placement_cutoff", "use_covalent_radii", or "covalent_radius_'
+                    'factor". Please specify another split file or start with a new '
+                    "split."
                 )
         else:
             if not self.num_train or not self.num_val:
@@ -376,29 +408,11 @@ class GenerativeAtomsDataModule(AtomsDataModule):
                     val_idx=self.val_idx,
                     test_idx=self.test_idx,
                     placement_cutoff=self.placement_cutoff,
+                    use_covalent_radii=self.use_covalent_radii,
+                    covalent_radius_factor=self.covalent_radius_factor,
                 )
 
-    def state_dict(self):
-        return {
-            "subset_idx": self.subset_idx,
-            "load_properties": self.load_properties,
-            "train_transforms": self.train_transforms,
-            "val_transforms": self.val_transforms,
-            "test_transforms": self.test_transforms,
-        }
-
-    def load_state_dict(self, state_dict: Dict[str, Any]) -> None:
-        self.subset_idx = state_dict["subset_idx"]
-        self._train_transforms = state_dict["train_transforms"]
-        self._val_transforms = state_dict["val_transforms"]
-        self._test_transforms = state_dict["test_transforms"]
-        self.load_properties = state_dict["load_properties"]
-        self.setup(stage="load_checkpoint")
-
     def register_properties(self, properties: List[str]):
-        if self.dataset is None:
-            # dataset not yet initialized, properties will be determined from checkpoint
-            return
         if properties is not None and len(properties) > 0:
             available_properties = self.dataset.available_properties
             for p in properties:
@@ -448,52 +462,3 @@ class GenerativeAtomsDataModule(AtomsDataModule):
             pin_memory=True,
             collate_fn=gschnet_collate_fn,
         )
-
-
-def check_connectivity(args):
-    # load molecule from data base
-    (
-        i,
-        datapath,
-        cutoff,
-        distance_conversion,
-        use_covalent_radii,
-        covalent_radius_factor,
-    ) = args
-    with connect(datapath) as con:
-        at = con.get(i + 1).toatoms()
-    at.positions *= distance_conversion
-    n_atoms = len(at.numbers)
-    # create list of neighbors inside cutoff
-    _idx_i, _idx_j, _r_ij = neighbor_list("ijd", at, cutoff, self_interaction=False)
-    if use_covalent_radii:
-        thresh = covalent_radii[at.numbers[_idx_i]] + covalent_radii[at.numbers[_idx_j]]
-        idcs = np.nonzero(_r_ij <= (thresh * covalent_radius_factor))[0]
-        _idx_i = _idx_i[idcs]
-        _idx_j = _idx_j[idcs]
-    n_nbh = np.bincount(_idx_i, minlength=n_atoms)
-    # check if there are atoms without neighbors, i.e. disconnected atoms
-    if np.sum(n_nbh == 0) > 0:
-        return False, i
-    # store where the neighbors in _idx_j of each center atom in _idx_i start
-    # assuming that _idx_i is ordered
-    start_idcs = np.append(np.zeros(1, dtype=int), np.cumsum(n_nbh))
-    # check connectivity of atoms given the neighbor list
-    seen = np.zeros(n_atoms, dtype=bool)
-    seen[0] = True
-    count = 1
-    first_neighbors = _idx_j[start_idcs[0] : start_idcs[1]]
-    seen[first_neighbors] = True
-    count += len(first_neighbors)
-    queue = deque(first_neighbors)
-    while queue and count < n_atoms:
-        atom = queue.popleft()
-        for neighbor in _idx_j[start_idcs[atom] : start_idcs[atom + 1]]:
-            if not seen[neighbor]:
-                seen[neighbor] = True
-                count += 1
-                queue.append(neighbor)
-    if count < n_atoms:
-        return False, i  # there are disconnected parts (we did not visit every atom)
-    else:
-        return True, i  # everything is connected via some path

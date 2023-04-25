@@ -4,12 +4,6 @@ import logging
 import operator
 from typing import Optional, List, Dict, Tuple, Union, Iterable, Any
 from tqdm import tqdm
-from multiprocessing import Pool
-from ase.db import connect
-from ase.data import covalent_radii
-from collections import deque
-from ase.neighborlist import neighbor_list
-from matscipy.neighbours import neighbour_list as msp_neighbor_list
 
 import numpy as np
 import fasteners

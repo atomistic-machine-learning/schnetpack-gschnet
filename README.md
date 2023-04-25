@@ -403,16 +403,16 @@ N. Gebauer, M. Gastegger, and K. Schütt. _Symmetry-adapted generation of 3d poi
 K.T. Schütt, S.S.P. Hessmann, N.W.A. Gebauer, J. Lederer, and M. Gastegger. _SchNetPack 2.0: A neural network toolbox for atomistic machine learning_. arXiv preprint arXiv:2212.05517 (2022). https://arxiv.org/abs/2212.05517
 
     @Article{gebauer2022inverse,
-        author={Gebauer, Niklas W. A. and Gastegger, Michael and Hessmann, Stefaan S. P. and M{\"u}ller, Klaus-Robert and Sch{\"u}tt, Kristof T.},
-        title={Inverse design of 3d molecular structures with conditional generative neural networks},
-        journal={Nature Communications},
-        year={2022},
-        volume={13},
-        number={1},
-        pages={973},
-        issn={2041-1723},
-        doi={10.1038/s41467-022-28526-y},
-        url={https://doi.org/10.1038/s41467-022-28526-y}
+        author = {Gebauer, Niklas W. A. and Gastegger, Michael and Hessmann, Stefaan S. P. and M{\"u}ller, Klaus-Robert and Sch{\"u}tt, Kristof T.},
+        title = {Inverse design of 3d molecular structures with conditional generative neural networks},
+        journal = {Nature Communications},
+        year = {2022},
+        volume = {13},
+        number = {1},
+        pages = {973},
+        issn = {2041-1723},
+        doi = {10.1038/s41467-022-28526-y},
+        url = {https://doi.org/10.1038/s41467-022-28526-y},
     }
     @incollection{gebauer2019symmetry,
         author = {Gebauer, Niklas and Gastegger, Michael and Sch\"{u}tt, Kristof},
@@ -422,13 +422,21 @@ K.T. Schütt, S.S.P. Hessmann, N.W.A. Gebauer, J. Lederer, and M. Gastegger. _Sc
         year = {2019},
         pages = {7566--7578},
         publisher = {Curran Associates, Inc.},
-        url = {http://papers.nips.cc/paper/8974-symmetry-adapted-generation-of-3d-point-sets-for-the-targeted-discovery-of-molecules.pdf}
+        url = {http://papers.nips.cc/paper/8974-symmetry-adapted-generation-of-3d-point-sets-for-the-targeted-discovery-of-molecules.pdf},
     }
-    @Article{schutt2022schnetpack,
-      title={SchNetPack 2.0: A neural network toolbox for atomistic machine learning},
-      author={Sch{\"u}tt, Kristof T and Hessmann, Stefaan SP and Gebauer, Niklas WA and Lederer, Jonas and Gastegger, Michael},
-      journal={arXiv preprint arXiv:2212.05517},
-      year={2022}
+    @article{schutt2023schnetpack,
+        author = {Sch{\"u}tt, Kristof T. and Hessmann, Stefaan S. P. and Gebauer, Niklas W. A. and Lederer, Jonas and Gastegger, Michael},
+        title = "{SchNetPack 2.0: A neural network toolbox for atomistic machine learning}",
+        journal = {The Journal of Chemical Physics},
+        volume = {158},
+        number = {14},
+        year = {2023},
+        month = {04},
+        issn = {0021-9606},
+        doi = {10.1063/5.0138367},
+        url = {https://doi.org/10.1063/5.0138367},
+        note = {144801},
+        eprint = {https://pubs.aip.org/aip/jcp/article-pdf/doi/10.1063/5.0138367/16825487/144801\_1\_5.0138367.pdf},
     }
 
 ## How does cG-SchNet work?

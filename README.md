@@ -400,7 +400,7 @@ N.W.A. Gebauer, M. Gastegger, S.S.P. Hessmann, K.-R. Müller, and K.T. Schütt. 
 
 N. Gebauer, M. Gastegger, and K. Schütt. _Symmetry-adapted generation of 3d point sets for the targeted discovery of molecules_. In H. Wallach, H. Larochelle, A. Beygelzimer, F. d'Alché-Buc, E. Fox, and R. Garnett, editors, Advances in Neural Information Processing Systems 32, 7566–7578. Curran Associates, Inc. (2019). http://papers.nips.cc/paper/8974-symmetry-adapted-generation-of-3d-point-sets-for-the-targeted-discovery-of-molecules.pdf
 
-K.T. Schütt, S.S.P. Hessmann, N.W.A. Gebauer, J. Lederer, and M. Gastegger. _SchNetPack 2.0: A neural network toolbox for atomistic machine learning_. arXiv preprint arXiv:2212.05517 (2022). https://arxiv.org/abs/2212.05517
+K.T. Schütt, S.S.P. Hessmann, N.W.A. Gebauer, J. Lederer, and M. Gastegger. _SchNetPack 2.0: A neural network toolbox for atomistic machine learning_. The Journal of Chemical Physics 158, 144801 (2023). https://doi.org/10.1063/5.0138367
 
     @Article{gebauer2022inverse,
         author = {Gebauer, Niklas W. A. and Gastegger, Michael and Hessmann, Stefaan S. P. and M{\"u}ller, Klaus-Robert and Sch{\"u}tt, Kristof T.},

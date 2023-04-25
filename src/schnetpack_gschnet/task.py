@@ -97,6 +97,23 @@ class ConditionalGenerativeSchNetTask(AtomisticTask):
         if stage == "fit":
             self.model.initialize_transforms(dm)
 
+    def load_state_dict(self, state_dict: Dict[str, Any]) -> None:
+        # make sure that cutoff values have not been changed
+        for name, val1 in [
+            ("model_cutoff", self.model.model_cutoff),
+            ("prediction_cutoff", self.model.prediction_cutoff),
+            ("placement_cutoff", self.model.placement_cutoff),
+        ]:
+            val2 = state_dict[f"model.{name}"]
+            if val2 != val1:
+                raise ValueError(
+                    f"The {name} in the checkpoint is different from the {name} in "
+                    f"the config ({val2:.2f}!={val1:.2f}). You cannot change the "
+                    f"{name}. Please set it to {val2:.2f} or train a new model."
+                )
+        # load checkpoint
+        super().load_state_dict(state_dict)
+
     def loss_fn(self, pred, batch, return_individual_losses=False):
         # calculate loss on type predictions (NLL loss using atomic types as classes)
         type_labels = batch[properties.pred_Z]

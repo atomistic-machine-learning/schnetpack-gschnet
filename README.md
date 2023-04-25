@@ -430,12 +430,12 @@ K.T. Schütt, S.S.P. Hessmann, N.W.A. Gebauer, J. Lederer, and M. Gastegger. _Sc
         journal = {The Journal of Chemical Physics},
         volume = {158},
         number = {14},
+        pages = {144801},
         year = {2023},
         month = {04},
         issn = {0021-9606},
         doi = {10.1063/5.0138367},
         url = {https://doi.org/10.1063/5.0138367},
-        note = {144801},
         eprint = {https://pubs.aip.org/aip/jcp/article-pdf/doi/10.1063/5.0138367/16825487/144801\_1\_5.0138367.pdf},
     }
 

@@ -377,11 +377,12 @@ Accordingly, every time a run is started, a new folder is created and a new mode
 However, if you set `run.id=<your_name>` in your CLI call the training will be resumed if there already exists a folder called `<your_name>` (otherwise, a fresh run with that name will be initialized). 
 
 ### 2. Data preprocessing is getting stuck or crashing
-We use multi-processing to speed up the data setup phase before training starts.
-On some machines, this can lead to [the process getting stuck](https://github.com/atomistic-machine-learning/schnetpack-gschnet/issues/3) or [crashes with error messages related to pickle](https://github.com/atomistic-machine-learning/cG-SchNet/issues/3).
-To circumvent this problem, multi-processing can be deactivated for the data setup by appending `+data.num_preprocessing_workers=0` to the training call.
-This will lead to slightly longer preprocessing times, e.g. 4 minutes instead of 1 minute on QM9 using a modern CPU. However, this is not a big harm as the data setup only needs to be done once prior to training.
-Note that the regular, repeated data loading is not impacted by this setting and can still run in parallel (it is configured with `data.num_workers`).
+In earlier versions, we used python's builtin `multiprocessing` package to speed up the data setup phase before training starts.
+On some machines, this has led to [the process getting stuck](https://github.com/atomistic-machine-learning/schnetpack-gschnet/issues/3) or [crashes with error messages related to pickle](https://github.com/atomistic-machine-learning/cG-SchNet/issues/3).
+However, we transitioned to using a `pytorch` dataloader with multiple workers for this task which is 1. a bit faster and 2. should run on all systems.
+Therefore, please make sure that you are using `schnetpack-gschnet>=1.0.0` if the preprocessing is getting stuck or crashing.
+If the problem still persists, please open an issue.
+As a short-term fix, multi-processing can be deactivated for the data setup by appending `+data.num_preprocessing_workers=0` to the training call.
 
 ## Changes in this implementation
 

@@ -97,7 +97,7 @@ class ConditionalGenerativeSchNetTask(AtomisticTask):
         if stage == "fit":
             self.model.initialize_transforms(dm)
 
-    def load_state_dict(self, state_dict: Dict[str, Any]) -> None:
+    def load_state_dict(self, state_dict: Dict[str, Any], **kwargs) -> None:
         # make sure that cutoff values have not been changed
         for name, val1 in [
             ("model_cutoff", self.model.model_cutoff),
@@ -112,7 +112,7 @@ class ConditionalGenerativeSchNetTask(AtomisticTask):
                     f"{name}. Please set it to {val2:.2f} or train a new model."
                 )
         # load checkpoint
-        super().load_state_dict(state_dict)
+        super().load_state_dict(state_dict, **kwargs)
 
     def loss_fn(self, pred, batch, return_individual_losses=False):
         # calculate loss on type predictions (NLL loss using atomic types as classes)

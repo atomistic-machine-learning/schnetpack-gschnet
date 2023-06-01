@@ -407,7 +407,7 @@ class GenerativeAtomsDataModule(AtomsDataModule):
                 )
 
     def register_properties(self, properties: List[str]):
-        if properties is not None and len(properties) > 0:
+        if properties is not None:
             available_properties = self.dataset.available_properties
             for p in properties:
                 if p not in available_properties:

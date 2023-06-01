@@ -304,7 +304,7 @@ class ConditionalGenerativeSchNet(AtomisticModel):
 
     def get_required_data_properties(self):
         if self.conditioning_module is None:
-            return None
+            return []
         else:
             return self.conditioning_module.required_data_properties
 

@@ -10,7 +10,7 @@ __all__ = [
     "OrderByDistanceToOrigin",
     "GetComposition",
     "GetRelativeAtomicEnergy",
-    "GetRandomSubstructure"
+    "GetRandomSubstructure",
 ]
 
 
@@ -204,26 +204,25 @@ class GetRandomSubstructure(Transform):
     is_postprocessor: bool = False
 
     def __init__(
-            self,
-            percentage: Optional[float] = 0.5,
+        self,
+        percentage: Optional[float] = 0.5,
     ):
         """
         Args:
-            percentage: Number in [0, 1) that determines the percentage of atoms are
-                part of the randomly sampled substructure.
+            percentage: Number in [0, 1) that determines the percentage of atoms
+                that are part of the randomly sampled substructure.
         """
         self.percentage = percentage
         super().__init__()
 
-
     def forward(
-            self,
-            inputs: Dict[str, torch.Tensor],
+        self,
+        inputs: Dict[str, torch.Tensor],
     ) -> Dict[str, torch.Tensor]:
         # number of atoms in the molecule
         n_atoms_mol = int(inputs[properties.n_atoms])
         # number of atoms in the substructure
-        n_atoms_substructure = int(self.percentage*n_atoms_mol)
+        n_atoms_substructure = int(self.percentage * n_atoms_mol)
         # make sure that at least one atom is not part of the substructure
         if n_atoms_mol == n_atoms_substructure:
             n_atoms_substructure -= 1

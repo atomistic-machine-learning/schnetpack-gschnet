@@ -554,12 +554,12 @@ class BuildAtomsTrajectoryFromSubstructure(Transform):
     is_postprocessor: bool = False
 
     def __init__(
-            self,
-            focus_type: int = 92,
-            stop_type: int = 94,
-            draw_random_samples: int = 0,
-            sort_idx_i: bool = False,
-            mark_substructure_as_finished: bool = True,
+        self,
+        focus_type: int = 92,
+        stop_type: int = 94,
+        draw_random_samples: int = 0,
+        sort_idx_i: bool = False,
+        mark_substructure_as_finished: bool = True,
     ):
         """
         Args:
@@ -603,12 +603,12 @@ class BuildAtomsTrajectoryFromSubstructure(Transform):
         self.atom_conditions = conditions["atom"]
 
     def extract_substructure_neighborhood(
-            self,
-            n_atoms: int,
-            substructure_idcs: torch.Tensor,
-            idx_i: torch.Tensor,
-            idx_j: torch.Tensor,
-            return_complement: Optional[bool] = False,
+        self,
+        n_atoms: int,
+        substructure_idcs: torch.Tensor,
+        idx_i: torch.Tensor,
+        idx_j: torch.Tensor,
+        return_complement: Optional[bool] = False,
     ):
         """
         Extracts the neighborhood (i.e. center atoms idx_i, neighbors idx_j, and the
@@ -658,7 +658,7 @@ class BuildAtomsTrajectoryFromSubstructure(Transform):
         return idx_i, idx_j, n_nbhs
 
     def sample_atom_placement_trajectory(
-            self, inputs: Dict[str, torch.Tensor]
+        self, inputs: Dict[str, torch.Tensor]
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         # number of atoms in the molecule
         n_atoms = int(inputs[properties.n_atoms])
@@ -670,7 +670,7 @@ class BuildAtomsTrajectoryFromSubstructure(Transform):
             # Only keep parts of the neighborhood that are not completely contained
             # inside the pre-defined substructure. Only these atoms shall be part
             # of the sampled atom placement trajectory
-            idx_i, idx_j, n_nbhs =  self.extract_substructure_neighborhood(
+            idx_i, idx_j, n_nbhs = self.extract_substructure_neighborhood(
                 n_atoms,
                 substructure_idcs,
                 inputs[properties.idx_i][inputs[properties.nbh_placement]],
@@ -694,11 +694,10 @@ class BuildAtomsTrajectoryFromSubstructure(Transform):
         # finished).
         n_steps = (n_atoms * 2) - len(substructure_idcs)
         if self.mark_substructure_as_finished:
-            finished_in_substructure = n_nbhs==0
+            finished_in_substructure = n_nbhs == 0
             n_steps -= torch.sum(finished_in_substructure)
         # draw which of the steps shall be predicted by the model
-        if (self.draw_random_samples > 0 and
-                self.draw_random_samples < n_steps):
+        if self.draw_random_samples > 0 and self.draw_random_samples < n_steps:
             # draw randomly
             chosen_steps, _ = torch.multinomial(
                 torch.ones(n_steps),
@@ -720,11 +719,11 @@ class BuildAtomsTrajectoryFromSubstructure(Transform):
         unplaced = torch.ones(n_atoms, dtype=torch.bool)
         # number of neighbors already placed for each atom
         n_nbhs_placed = torch.zeros(n_atoms, dtype=torch.long)
-        # the atom focused at each step chosen for prediction
+        # the atom focused at each prediction step
         foci = torch.empty(len(chosen_steps), dtype=torch.long)
-        # the type of the atom placed at each step chosen for prediction
+        # the type of the atom placed at each prediction step
         pred_types = torch.empty(len(chosen_steps), dtype=torch.long)
-        # the number of atoms already placed at each step chosen for prediction
+        # the number of atoms already placed at each prediction step
         n_placed_so_far = torch.empty(len(chosen_steps), dtype=torch.long)
 
         # start sampling of the atom placement trajectory
@@ -758,7 +757,6 @@ class BuildAtomsTrajectoryFromSubstructure(Transform):
         # now traverse the molecular graph to place remaining atoms (choosing the focus
         # randomly at each step)
         for i in range(start_step, n_steps):
-
             # end loop if all steps have been sampled
             if chosen_counter >= len(chosen_steps):
                 break
@@ -787,8 +785,7 @@ class BuildAtomsTrajectoryFromSubstructure(Transform):
                     # update number of placed neighbors for focus since we might have
                     # skipped some previously placed neighbors from `neighbor_idcs`
                     # and we placed an unplaced neighbor
-                    n_nbhs_placed[focus] = (len(neighbor_idcs) -
-                                             len(unplaced_idcs) + 1)
+                    n_nbhs_placed[focus] = len(neighbor_idcs) - len(unplaced_idcs) + 1
                     # store type of the next atom
                     pred_type = types[next_atom]
                     placed_atom = True
@@ -827,8 +824,8 @@ class BuildAtomsTrajectoryFromSubstructure(Transform):
         return order, foci, pred_types, n_placed_so_far
 
     def forward(
-            self,
-            inputs: Dict[str, torch.Tensor],
+        self,
+        inputs: Dict[str, torch.Tensor],
     ) -> Dict[str, torch.Tensor]:
         # prepare tokens
         if self.focus_type is not None:
@@ -839,8 +836,12 @@ class BuildAtomsTrajectoryFromSubstructure(Transform):
 
         # sample atom placement trajectory (the new atom order, the focus, the type
         # to predict at each step, and the number of atoms available for prediction)
-        order, focus, pred_types, n_placed_so_far = \
-            self.sample_atom_placement_trajectory(inputs)
+        (
+            order,
+            focus,
+            pred_types,
+            n_placed_so_far,
+        ) = self.sample_atom_placement_trajectory(inputs)
         n_steps = len(focus)  # number of steps to be predicted from the trajectory
 
         # store the new index of each atom given by the sampled trajectory
@@ -880,9 +881,9 @@ class BuildAtomsTrajectoryFromSubstructure(Transform):
 
         # Sort neighborhood list by ascending i (with respect to new atom order):
         n_nbh = inputs[properties.n_nbh]
-        start_idcs = n_nbh.cumsum(dim=0)-n_nbh
+        start_idcs = n_nbh.cumsum(dim=0) - n_nbh
         nbh_list_order = torch.cat(
-            [torch.arange(start_idcs[i], start_idcs[i]+n_nbh[i]) for i in order],
+            [torch.arange(start_idcs[i], start_idcs[i] + n_nbh[i]) for i in order],
             dim=0,
         )
         # load neighborlist using the new atom indicies from the sampled order
@@ -892,8 +893,8 @@ class BuildAtomsTrajectoryFromSubstructure(Transform):
         offsets = inputs[properties.offsets][nbh_list_order]
         # build n_nbh with correct order and 0 as first entry for token
         n_nbh = torch.cat([torch.zeros(n_tokens, dtype=torch.long), n_nbh[order]])
-        start_idcs = n_nbh.cumsum(dim=0)-n_nbh
-        start_idcs = torch.cat([start_idcs, start_idcs[-1:]+n_nbh[-1:]], dim=0)
+        start_idcs = n_nbh.cumsum(dim=0) - n_nbh
+        start_idcs = torch.cat([start_idcs, start_idcs[-1:] + n_nbh[-1:]], dim=0)
 
         # load information about cutoff-specific neighborhoods
         extract_nbh_model = False
@@ -950,7 +951,7 @@ class BuildAtomsTrajectoryFromSubstructure(Transform):
             if cur_step == 0:
                 n_prev_placed = 0
             else:
-                n_prev_placed = n_placed_so_far[cur_step-1]
+                n_prev_placed = n_placed_so_far[cur_step - 1]
 
             # 1. Build neighborhood lists for this prediction step:
             # extend neighborhood with atoms from new block
@@ -987,7 +988,7 @@ class BuildAtomsTrajectoryFromSubstructure(Transform):
             new_r_ij += gathered_r_ij
             new_off += gathered_off
             if cur_step > 0:
-                n_ij_pairs[cur_step] += n_ij_pairs[cur_step-1]
+                n_ij_pairs[cur_step] += n_ij_pairs[cur_step - 1]
             # extend neighborhood with pairs from focus
             start = start_idcs[cur_focus]
             end = start + n_nbh[cur_focus]
@@ -1025,7 +1026,7 @@ class BuildAtomsTrajectoryFromSubstructure(Transform):
                     new_idx_j += [included_j, included_i, foc_pair[[-1, -2]]]
                     new_r_ij += [included_r_ij, included_r_ij, foc_dist]
                     new_off += [included_off, -included_off, foc_off]
-                    n_foc_j_pairs[cur_step] = 2*len(included_j) + 2
+                    n_foc_j_pairs[cur_step] = 2 * len(included_j) + 2
             else:
                 pred_j = torch.empty(0, dtype=torch.long)
 
@@ -1037,7 +1038,7 @@ class BuildAtomsTrajectoryFromSubstructure(Transform):
                 pred_idx_j += [torch.zeros(n_tokens, dtype=torch.long)]
             # add focus atom to prediction neighborhood
             if cur_focus != 0:
-                pred_idx_j += [focus[cur_step:cur_step+1]]
+                pred_idx_j += [focus[cur_step : cur_step + 1]]
                 n_pred_nbh[cur_step] += 1
             # add other atoms
             new_R += [R[n_tokens:n_cur_placed]]
@@ -1047,7 +1048,16 @@ class BuildAtomsTrajectoryFromSubstructure(Transform):
             # store information for prediction of pairwise atom distances
             # if a new atom is placed in this step
             if pred_types[cur_step] != self.stop_type and cur_focus != 0:
-                _foc_idcs = [cur_focus,]*2 if n_tokens > 0 else [cur_focus,]
+                _foc_idcs = (
+                    [
+                        cur_focus,
+                    ]
+                    * 2
+                    if n_tokens > 0
+                    else [
+                        cur_focus,
+                    ]
+                )
                 pred_r_ij += [
                     torch.linalg.norm(
                         R[None, n_cur_placed] - R[_foc_idcs, :],
@@ -1060,7 +1070,9 @@ class BuildAtomsTrajectoryFromSubstructure(Transform):
                 ]
                 n_prev_pred_nbh = n_pred_nbh[:cur_step].sum()
                 pred_r_ij_idcs += [
-                    torch.arange(n_prev_pred_nbh, n_prev_pred_nbh+n_pred_nbh[cur_step]),
+                    torch.arange(
+                        n_prev_pred_nbh, n_prev_pred_nbh + n_pred_nbh[cur_step]
+                    ),
                 ]
                 next_Z += [
                     torch.full(
@@ -1086,9 +1098,8 @@ class BuildAtomsTrajectoryFromSubstructure(Transform):
         pred_idx_offsets = torch.repeat_interleave(
             atom_idx_offset,
             n_pred_nbh,
-            )
-        inputs[properties.pred_idx_j] = (torch.cat(pred_idx_j, dim=0)
-                                         + pred_idx_offsets)
+        )
+        inputs[properties.pred_idx_j] = torch.cat(pred_idx_j, dim=0) + pred_idx_offsets
         inputs[properties.pred_idx_m] = torch.repeat_interleave(
             torch.arange(n_steps), n_pred_nbh
         )
@@ -1099,8 +1110,7 @@ class BuildAtomsTrajectoryFromSubstructure(Transform):
         inputs[properties.next_Z] = torch.cat(next_Z, dim=0)
         # store updated n_nbh
         inputs[properties.n_nbh] = torch.bincount(
-            inputs[properties.idx_i],
-            minlength=n_placed_so_far.sum()
+            inputs[properties.idx_i], minlength=n_placed_so_far.sum()
         )
         # repeat remaining molecule-wise entries in inputs for each step
         if self.draw_random_samples != 1:

@@ -1053,9 +1053,7 @@ class BuildAtomsTrajectoryFromSubstructure(Transform):
                     _foc_idcs = [cur_focus, cur_focus]
                 else:
                     # only need to predict distance to focus atom
-                    _foc_idcs = [
-                        cur_focus,
-                    ]
+                    _foc_idcs = [cur_focus]
                 pred_r_ij += [
                     torch.linalg.norm(
                         R[None, n_cur_placed] - R[_foc_idcs, :],

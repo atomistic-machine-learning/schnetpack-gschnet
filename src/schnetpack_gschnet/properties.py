@@ -29,6 +29,9 @@ n_nbh_prediction: Final[str] = "_n_nbh_prediction"
 #: number of neighbors for each atom in placement cutoff
 n_nbh_placement: Final[str] = "_n_nbh_placement"
 
+#: the indices of atoms that are already placed if starting from a scaffold
+substructure_idcs: Final[str] = "_substructure_idcs"
+
 ## information required for prediction
 # the type is predicted at every step (half of the time, the stop type is predicted to
 # mark the focus as finished)

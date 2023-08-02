@@ -44,7 +44,6 @@ callbacks:
 data:
   transforms:
     - _target_: schnetpack.transform.SubtractCenterOfMass
-    - _target_: schnetpack_gschnet.transform.OrderByDistanceToOrigin
     - _target_: schnetpack_gschnet.transform.ConditionalGSchNetNeighborList
       model_cutoff: ${globals.model_cutoff}
       prediction_cutoff: ${globals.prediction_cutoff}
@@ -52,11 +51,12 @@ data:
       environment_provider: matscipy
       use_covalent_radii: ${globals.use_covalent_radii}
       covalent_radius_factor: ${globals.covalent_radius_factor}
-    - _target_: schnetpack_gschnet.transform.BuildAtomsTrajectory
-      centered: True
-      origin_type: ${globals.origin_type}
+    - _target_: schnetpack_gschnet.transform.GetRandomSubstructure
+      percentage: 0.0
+    - _target_: schnetpack_gschnet.transform.BuildAtomsTrajectoryFromSubstructure
       focus_type: ${globals.focus_type}
       stop_type: ${globals.stop_type}
       draw_random_samples: ${globals.draw_random_samples}
       sort_idx_i: False
+      mark_substructure_as_finished: True
     - _target_: schnetpack.transform.CastTo32

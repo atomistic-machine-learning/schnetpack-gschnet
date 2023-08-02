@@ -52,7 +52,7 @@ data:
       use_covalent_radii: ${globals.use_covalent_radii}
       covalent_radius_factor: ${globals.covalent_radius_factor}
     - _target_: schnetpack_gschnet.transform.GetRandomSubstructure
-      percentage: 0.0
+      percentage: 0.5
     - _target_: schnetpack_gschnet.transform.BuildAtomsTrajectoryFromSubstructure
       focus_type: ${globals.focus_type}
       stop_type: ${globals.stop_type}

@@ -558,7 +558,6 @@ class BuildAtomsTrajectoryFromSubstructure(Transform):
         focus_type: int = 92,
         stop_type: int = 94,
         draw_random_samples: int = 0,
-        sort_idx_i: bool = False,
         mark_substructure_as_finished: bool = True,
     ):
         """
@@ -573,8 +572,6 @@ class BuildAtomsTrajectoryFromSubstructure(Transform):
             draw_random_samples: Number of samples that are randomly drawn from the
                 atom placement trajectory to train the model (set 0 to use all steps
                 instead).
-            sort_idx_i: Set true to sort the `idx_i` in the output of this transform in
-                ascending order (otherwise they will be unordered).
             mark_substructure_as_finished: If true, atoms inside the substructure that
                 are not connected to any atoms outside of the substructure are.
                 automatically marked as finished, i.e. the model will not use them as
@@ -584,7 +581,6 @@ class BuildAtomsTrajectoryFromSubstructure(Transform):
         self.focus_type = focus_type
         self.stop_type = stop_type
         self.draw_random_samples = draw_random_samples
-        self.sort_idx_i = sort_idx_i
         self.mark_substructure_as_finished = mark_substructure_as_finished
         # we have three lists that store different types of conditions
         # 1. the condition is shared by all atoms in the whole trajectory

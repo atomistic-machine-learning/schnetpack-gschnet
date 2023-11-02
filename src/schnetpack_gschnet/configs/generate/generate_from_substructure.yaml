@@ -1,0 +1,41 @@
+defaults:
+  - conditions: null
+  - _self_
+
+n_molecules: 100
+batch_size: 10
+max_n_atoms: 35
+grid_distance_min: 0.7
+grid_spacing: 0.05
+temperature_term: 0.1
+grid_batch_size: 0
+
+start_from_substructure: True
+
+substructure:
+  idcs: ???
+  data:
+    _target_: schnetpack_gschnet.datasets.QM9Gen
+    datapath: ???
+    placement_cutoff: ???
+    use_covalent_radii: ???
+    covalent_radius_factor: ???
+    remove_uncharacterized: ???
+    split_file: split.npz
+    batch_size: 1
+    num_test_workers: 2
+    distance_unit: Ang
+    property_units:
+      energy_U0: eV
+      energy_U: eV
+      enthalpy_H: eV
+      free_energy: eV
+      homo: eV
+      lumo: eV
+      gap: eV
+      zpve: eV
+    transforms:
+      - _target_: schnetpack.transform.SubtractCenterOfMass
+      - _target_: schnetpack_gschnet.transform.GetRandomSubstructure
+        percentage: 0.5
+      - _target_: schnetpack.transform.CastTo32

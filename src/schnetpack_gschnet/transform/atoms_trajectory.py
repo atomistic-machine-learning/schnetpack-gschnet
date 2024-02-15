@@ -559,6 +559,7 @@ class BuildAtomsTrajectoryFromSubstructure(Transform):
         stop_type: int = 94,
         draw_random_samples: int = 0,
         mark_substructure_as_finished: bool = True,
+        place_by_distance_to_focus: bool = False,
     ):
         """
         Args:
@@ -576,12 +577,16 @@ class BuildAtomsTrajectoryFromSubstructure(Transform):
                 are not connected to any atoms outside of the substructure are.
                 automatically marked as finished, i.e. the model will not use them as
                 training data to learn to predict stop.
+            place_by_distance_to_focus: If true, the next atom for placement is
+                chosen by its distance to the focus, i.e. the unplaced neighbor
+                closest to the focus is placed next.
         """
         super().__init__()
         self.focus_type = focus_type
         self.stop_type = stop_type
         self.draw_random_samples = draw_random_samples
         self.mark_substructure_as_finished = mark_substructure_as_finished
+        self.place_by_distance_to_focus = place_by_distance_to_focus
         # we have three lists that store different types of conditions
         # 1. the condition is shared by all atoms in the whole trajectory
         self.trajectory_conditions = []
@@ -604,6 +609,7 @@ class BuildAtomsTrajectoryFromSubstructure(Transform):
         substructure_idcs: torch.Tensor,
         idx_i: torch.Tensor,
         idx_j: torch.Tensor,
+        r_ij: torch.Tensor,
         return_complement: Optional[bool] = False,
     ):
         """
@@ -620,6 +626,7 @@ class BuildAtomsTrajectoryFromSubstructure(Transform):
                 as a mask that marks atoms inside the substructure with True.
             idx_i: Neighborlist with center atoms.
             idx_j: Neighborlist with neighbor atoms.
+            r_ij: Distances bewteen center atoms and neighbor atoms.
             return_complement: Set true to return the complementary neighborhood,
                 i.e. the remaining pairs not completely contained inside the
                 provided substructure.
@@ -646,12 +653,13 @@ class BuildAtomsTrajectoryFromSubstructure(Transform):
         # only keep the remaining pairs
         idx_i = idx_i[remaining_pairs]
         idx_j = idx_j[remaining_pairs]
+        r_ij = r_ij[remaining_pairs]
         # count number of neighbors per center atom
         # assumes that idx_i is sorted!
         n_nbhs = torch.zeros(n_atoms, dtype=torch.long)
         idcs, counts = torch.unique_consecutive(idx_i, return_counts=True)
         n_nbhs[idcs] = counts
-        return idx_i, idx_j, n_nbhs
+        return idx_i, idx_j, r_ij, n_nbhs
 
     def sample_atom_placement_trajectory(
         self, inputs: Dict[str, torch.Tensor]
@@ -666,11 +674,12 @@ class BuildAtomsTrajectoryFromSubstructure(Transform):
             # Only keep parts of the neighborhood that are not completely contained
             # inside the pre-defined substructure. Only these atoms shall be part
             # of the sampled atom placement trajectory
-            idx_i, idx_j, n_nbhs = self.extract_substructure_neighborhood(
+            idx_i, idx_j, r_ij, n_nbhs = self.extract_substructure_neighborhood(
                 n_atoms,
                 substructure_idcs,
                 inputs[properties.idx_i][inputs[properties.nbh_placement]],
                 inputs[properties.idx_j][inputs[properties.nbh_placement]],
+                inpust[properties.r_ij][inputs[properties.nbh_placement]],
                 return_complement=True,
             )
         else:
@@ -679,6 +688,8 @@ class BuildAtomsTrajectoryFromSubstructure(Transform):
             idx_i = inputs[properties.idx_i][inputs[properties.nbh_placement]]
             # indices of the neighbors of the center atoms (inside placement cutoff)
             idx_j = inputs[properties.idx_j][inputs[properties.nbh_placement]]
+            # distances between center and neighbor atoms
+            r_ij = inputs[properties.r_ij][inputs[properties.nbh_placement]]
             # number of neighbors per center atom
             n_nbhs = inputs[properties.n_nbh_placement]
 
@@ -772,9 +783,15 @@ class BuildAtomsTrajectoryFromSubstructure(Transform):
                 # check status in "unplaced"
                 unplaced_idcs = torch.nonzero(unplaced[neighbor_idcs])
                 if len(unplaced_idcs) > 0:
-                    # place a random unplaced neighbor
-                    random_idx = torch.randint(0, len(unplaced_idcs), [1])[0]
-                    next_atom = neighbor_idcs[unplaced_idcs[random_idx]]
+                    if self.place_by_distance_to_focus:
+                        # place the unplaced neighbor closest to the focus
+                        neighbor_r_ij = r_ij[start_idx:stop_idx][unplaced_idcs]
+                        closest_idx = torch.argmin(neighbor_r_ij)
+                        next_atom = neighbor_idcs[unplaced_idcs[closest_idx]]
+                    else:
+                        # place a random unplaced neighbor
+                        random_idx = torch.randint(0, len(unplaced_idcs), [1])[0]
+                        next_atom = neighbor_idcs[unplaced_idcs[random_idx]]
                     unplaced[next_atom] = 0  # mark as placed
                     avail[next_atom] = 1  # mark next atom as available as focus
                     order[n_placed] = next_atom  # add next atom to the order

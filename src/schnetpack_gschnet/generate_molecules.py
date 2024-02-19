@@ -384,6 +384,7 @@ def generate_molecules(
 
     # center positions on origin
     R = R - R[:, 1:2]
+    n_tokens = 2  # we used origin and focus tokens in this function
     return R, Z, finished_list, n_tokens
 
 

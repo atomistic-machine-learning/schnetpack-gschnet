@@ -552,6 +552,7 @@ class BuildAtomsTrajectoryFromSubstructure(Transform):
 
     is_preprocessor: bool = True
     is_postprocessor: bool = False
+    placement_strategies = ["random", "closest_to_focus", "first"]
 
     def __init__(
         self,
@@ -559,7 +560,7 @@ class BuildAtomsTrajectoryFromSubstructure(Transform):
         stop_type: int = 94,
         draw_random_samples: int = 0,
         mark_substructure_as_finished: bool = True,
-        place_by_distance_to_focus: bool = False,
+        placement_strategy: str = "random",
     ):
         """
         Args:
@@ -577,16 +578,24 @@ class BuildAtomsTrajectoryFromSubstructure(Transform):
                 are not connected to any atoms outside of the substructure are.
                 automatically marked as finished, i.e. the model will not use them as
                 training data to learn to predict stop.
-            place_by_distance_to_focus: If true, the next atom for placement is
-                chosen by its distance to the focus, i.e. the unplaced neighbor
-                closest to the focus is placed next.
+            placement_strategy: Sets the strategy for choosing the next atom for
+                placement among the neighbors of the focus. Can be 'random' for
+                choosing a neighbor uniformly randomly, 'closest_to_focus' for
+                choosing the neighbor with the smallest distance to the focus, or
+                'first' for choosing the first atom in the list, e.g. for choosing the
+                neighbor with the smallest distance to the center of mass if the atoms
+                are sorted by distance to the center of mass. In case the molecules
+                are built from scratch, i.e. not starting from a substructure, the
+                first atom in the trajectory is sampled uniformly randomly except for
+                the strategy 'first', where the first atom in the list is taken as the
+                starting point.
         """
         super().__init__()
         self.focus_type = focus_type
         self.stop_type = stop_type
         self.draw_random_samples = draw_random_samples
         self.mark_substructure_as_finished = mark_substructure_as_finished
-        self.place_by_distance_to_focus = place_by_distance_to_focus
+        self.placement_strategy = placement_strategy
         # we have three lists that store different types of conditions
         # 1. the condition is shared by all atoms in the whole trajectory
         self.trajectory_conditions = []
@@ -594,6 +603,11 @@ class BuildAtomsTrajectoryFromSubstructure(Transform):
         self.step_conditions = []
         # 3. each atom has its own condition
         self.atom_conditions = []
+        if self.placement_strategy not in self.placement_strategies:
+            raise ValueError(
+                f"Chosen placement_strategy '{self.placement_strategy}' does not "
+                f"exist. Please choose from {self.placement_strategies}."
+            )
 
     def datamodule(self, value):
         pass
@@ -679,7 +693,7 @@ class BuildAtomsTrajectoryFromSubstructure(Transform):
                 substructure_idcs,
                 inputs[properties.idx_i][inputs[properties.nbh_placement]],
                 inputs[properties.idx_j][inputs[properties.nbh_placement]],
-                inpust[properties.r_ij][inputs[properties.nbh_placement]],
+                inputs[properties.r_ij][inputs[properties.nbh_placement]],
                 return_complement=True,
             )
         else:
@@ -746,7 +760,12 @@ class BuildAtomsTrajectoryFromSubstructure(Transform):
             start_step = 0  # we did no step in the trajectory, loop from 0
         else:
             # if the there is no pre-defined substructure, randomly place a first atom
-            first_atom = torch.randint(0, n_atoms, [1])[0]
+            if self.placement_strategy == "first":
+                # take the first atom in the list as starting point
+                first_atom = 0
+            else:
+                # choose an atom as starting point uniformly randomly
+                first_atom = torch.randint(0, n_atoms, [1])[0]
             n_placed = 1  # we have placed only the first atom
             order[0] = first_atom  # add the first atom to order
             avail[first_atom] = 1  # the first atom is now available as focus
@@ -774,24 +793,32 @@ class BuildAtomsTrajectoryFromSubstructure(Transform):
 
             # check if there are unplaced neighbors
             if n_nbhs_placed[focus] < n_nbhs[focus]:
-                # n_nbhs_placed might be outdated, we need to check the neighbors
+                # n_nbhs_placed might be outdated, we need to check the neighbors'
                 # status in `unplaced`
                 start_idx = start_idcs[focus]
                 stop_idx = start_idcs[focus] + n_nbhs[focus]
                 # extract potentially unplaced neighbors
                 neighbor_idcs = idx_j[start_idx:stop_idx]
-                # check status in "unplaced"
-                unplaced_idcs = torch.nonzero(unplaced[neighbor_idcs])
+                # check status in `unplaced`
+                unplaced_idcs = torch.nonzero(unplaced[neighbor_idcs]).squeeze(-1)
                 if len(unplaced_idcs) > 0:
-                    if self.place_by_distance_to_focus:
+                    if self.placement_strategy == "random":
+                        # place a random unplaced neighbor
+                        random_idx = torch.randint(0, len(unplaced_idcs), [1])[0]
+                        next_atom = neighbor_idcs[unplaced_idcs[random_idx]]
+                    elif self.placement_strategy == "closest_to_focus":
                         # place the unplaced neighbor closest to the focus
                         neighbor_r_ij = r_ij[start_idx:stop_idx][unplaced_idcs]
                         closest_idx = torch.argmin(neighbor_r_ij)
                         next_atom = neighbor_idcs[unplaced_idcs[closest_idx]]
+                    elif self.placement_strategy == "first":
+                        # place the first unplaced neighbor
+                        next_atom = neighbor_idcs[unplaced_idcs[0]]
                     else:
-                        # place a random unplaced neighbor
-                        random_idx = torch.randint(0, len(unplaced_idcs), [1])[0]
-                        next_atom = neighbor_idcs[unplaced_idcs[random_idx]]
+                        raise RuntimeError(
+                            f"Placement strategy {self.placement_strategy} not "
+                            f"implemented!"
+                        )
                     unplaced[next_atom] = 0  # mark as placed
                     avail[next_atom] = 1  # mark next atom as available as focus
                     order[n_placed] = next_atom  # add next atom to the order

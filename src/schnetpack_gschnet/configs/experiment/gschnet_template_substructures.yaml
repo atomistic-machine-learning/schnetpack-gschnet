@@ -57,6 +57,6 @@ data:
       focus_type: ${globals.focus_type}
       stop_type: ${globals.stop_type}
       draw_random_samples: ${globals.draw_random_samples}
-      sort_idx_i: False
       mark_substructure_as_finished: True
+      placement_strategy: random
     - _target_: schnetpack.transform.CastTo32

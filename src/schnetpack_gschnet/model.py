@@ -109,14 +109,14 @@ class ConditionalGenerativeSchNet(AtomisticModel):
             do_postprocessing: If true, post-processing is applied.
             average_type_distributions: Determines how the distribution of the type of
                 the next atom is computed from all the distributions predicted by
-                individual atoms. In any case, the individual distributions are first
-                normalized with a softmax.
+                individual atoms.
                 If true, the average of individual distributions is taken as the
                 prediction.
                 If false, the individual distributions are instead multiplied
-                element-wise and then normalized by taking the softmax again, which
-                leads to sharper distributions compared to the averaging, i.e. it
-                further suppresses small probabilities and increases large ones.
+                element-wise and then normalized (by dividing by the sum of all
+                resulting elements), which leads to sharper distributions compared to
+                the averaging, i.e. it further suppresses small probabilities and
+                increases large ones.
             input_modules: Modules that are applied before representation, e.g. to
                 modify input or add additional tensors for response properties.
         """

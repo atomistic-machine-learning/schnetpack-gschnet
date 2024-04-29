@@ -36,6 +36,25 @@ class OrderByDistanceToOrigin(Transform):
         return inputs
 
 
+class GetNumHeavyAtoms(Transform):
+    """
+    Extracts the number of heavy atoms in a molecule.
+    """
+
+    is_preprocessor: bool = True
+    is_postprocessor: bool = False
+
+    def forward(
+        self,
+        inputs: Dict[str, torch.Tensor],
+    ) -> Dict[str, torch.Tensor]:
+        # count number of hydrogen atoms
+        n_Hs = torch.count_nonzero(inputs[properties.Z] == 1)
+        # the number of heavy atoms is the number of atoms - number of hydrogens
+        inputs["_n_heavy_atoms"] = inputs[properties.n_atoms] - n_Hs
+        return inputs
+
+
 class GetComposition(Transform):
     """
     Extracts the number of atoms in a molecule that correspond to types from a given

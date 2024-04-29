@@ -83,6 +83,31 @@ def generate(config: DictConfig):
     # load model
     model = torch.load("best_model", map_location=device)
 
+    # set up the metadata of the db (including the distance unit used in the model)
+    with connect(outputfile) as con:
+        try:
+            distance_unit = model.get_distance_unit()
+        except:
+            distance_unit = "unknown"
+        if n_existing_mols == 0:
+            md = {
+                "_property_unit_dict": {},
+                "_distance_unit": distance_unit,
+                "atomrefs": {},
+            }
+            con.metadata = md
+        else:
+            # if the db contains molecules verify the distance unit is consistent
+            if distance_unit != con.metadata["distance_unit"]:
+                raise ValueError(
+                    f"The data base already contains molecules generated from a "
+                    f"model using the distance unit "
+                    f"`{con.metadata['distance_unit']}`. Your current model is "
+                    f"using the distance unit `{distance_unit}`. "
+                    f"Please specify a different output file."
+                )
+        print(con.metadata)
+
     # parse composition (if it is included in conditions)
     if "conditions" not in config.generate:
         with open_dict(config):

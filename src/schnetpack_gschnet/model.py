@@ -76,7 +76,7 @@ class ConditionalGenerativeSchNet(AtomisticModel):
             placement_cutoff: determines which atoms are considered to be neighbors
                 when sampling sequences of atom placements (i.e. which atoms can be
                 placed given a focus atom) and thus the range of the grid around the
-                focus atom during generation
+                focus atom during generation.
             conditioning: Module that embeds the conditions, e.g. the composition or a
                 target property value. Set None to train an unconditional model.
             type_prediction_n_layers: Number of layers in the type prediction network.
@@ -166,6 +166,11 @@ class ConditionalGenerativeSchNet(AtomisticModel):
             "distance_bin_width",
             (self.distance_max - self.distance_min) / (self.n_distance_bins - 1),
         )
+        self.register_buffer(
+            "average_type_distributions",
+            torch.tensor(average_type_distributions, dtype=torch.bool),
+        )
+        self.register_buffer("distance_unit", torch.tensor([0]))
 
         # initialize type and distance prediction networks
         if type_prediction_n_hidden is None:
@@ -196,8 +201,6 @@ class ConditionalGenerativeSchNet(AtomisticModel):
         self.logsoftmax = nn.LogSoftmax(dim=-1)
 
         self.collect_derivatives()
-        self.average_type_distributions = average_type_distributions
-
         self.input_modules = nn.ModuleList(input_modules)
 
     def forward(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
@@ -313,6 +316,24 @@ class ConditionalGenerativeSchNet(AtomisticModel):
             return {"trajectory": [], "step": [], "atom": []}
         else:
             return self.conditioning_module.condition_names
+
+    def set_distance_unit(self, distance_unit):
+        _distance_unit = torch.tensor(list(map(ord, distance_unit)))
+        if len(self.distance_unit) != 1 or self.distance_unit != torch.tensor([0]):
+            if len(self.distance_unit) != len(_distance_unit) or torch.any(
+                self.distance_unit != _distance_unit
+            ):
+                raise RuntimeError(
+                    f"Trying to set the distance unit of the model to "
+                    f"{distance_unit}. However, the model has already been trained "
+                    f"with distance unit {self.get_distance_unit()}. The distance unit "
+                    f"cannot be changed after training!"
+                )
+        else:
+            self.distance_unit = _distance_unit
+
+    def get_distance_unit(self):
+        return "".join(map(chr, self.distance_unit.tolist()))
 
     def classes_to_types(self, classes: torch.Tensor):
         return self._all_types[classes]

@@ -93,7 +93,6 @@ def generate(config: DictConfig):
             md = {
                 "_property_unit_dict": {},
                 "_distance_unit": distance_unit,
-                "atomrefs": {},
             }
             con.metadata = md
         else:
@@ -225,6 +224,9 @@ def generate(config: DictConfig):
                     .cpu()
                     .numpy()
                     .tolist(),
+                    "max_n_atoms": config.generate.max_n_atoms,
+                    "grid_distance_min": config.generate.grid_distance_min,
+                    "grid_spacing": config.generate.grid_spacing,
                 }
             }
         )

@@ -7,6 +7,7 @@ from ase import Atoms
 import numpy as np
 import logging
 from tqdm import tqdm
+from rdkit import Chem
 
 from schnetpack.data import load_dataset, AtomsDataFormat, AtomsLoader
 from schnetpack_gschnet.transform import GetSmiles
@@ -78,16 +79,25 @@ def get_parser():
         action="store_true",
     )
     parser.add_argument(
-        "--compute_chirality_smiles",
-        help="If set, also computes/stores the smiles with information about "
-        "chirality.",
-        action="store_true",
-    )
-    parser.add_argument(
         "--compute_uniqueness",
         help="If set, also computes/stores the uniqueness of molecules, i.e. all "
         "smiles strings are compared with each other to identify duplicate "
         "molecules.",
+        action="store_true",
+    )
+    parser.add_argument(
+        "--ignore_enantiomers",
+        help="If set, mirror-image stereoisomers (enantiomers) are classified as "
+        "being identical structures when checking the uniqueness of molecules "
+        "or comparing them to training structures.",
+        action="store_true",
+    )
+    parser.add_argument(
+        "--ignore_isomerism",
+        help="If set, all isomeric information in smiles strings is ignored when "
+        "checking the uniqueness of molecules or comparing them to training "
+        "structures (i.e. we use the non-isomeric smiles for comparison). "
+        "However, the stored smiles strings will always be isomeric.",
         action="store_true",
     )
     parser.add_argument(
@@ -148,9 +158,10 @@ def main(
     ],
     allow_charged_fragments=False,
     allow_radical_electrons=False,
-    compute_chirality_smiles=False,
     compute_ring_statistics=False,
     force_recomputation=False,
+    ignore_enantiomers=False,
+    ignore_isomerism=False,
     compute_uniqueness=False,
     compare_db_path=None,
     compare_db_results_path=None,
@@ -178,7 +189,6 @@ def main(
                 allow_radical_electrons=allow_radical_electrons,
                 return_inputs=False,
                 store_validity=True,
-                store_chirality_smiles=compute_chirality_smiles,
                 store_chemical_formula=True,
                 store_ring_statistics=compute_ring_statistics,
             )
@@ -201,7 +211,6 @@ def main(
             numeric_stats = np.zeros((n_mols, 1), dtype=int)
         smiles = [""] * n_mols
         formulas = [""] * n_mols
-        chirality_smiles = [""] * n_mols
         i = 0
         failed_i = 0
 
@@ -219,9 +228,7 @@ def main(
                     numeric_stats=numeric_stats,
                     smiles=smiles,
                     formulas=formulas,
-                    chirality_smiles=chirality_smiles,
                     compute_ring_statistics=compute_ring_statistics,
-                    compute_chirality_smiles=compute_chirality_smiles,
                 )
                 if i < n_mols:
                     # an exception stopped the loop, one molecule was skipped
@@ -245,6 +252,8 @@ def main(
                 validity=validity,
                 smiles=smiles,
                 formulas=formulas,
+                ignore_enantiomers=ignore_enantiomers,
+                ignore_isomerism=ignore_isomerism,
             )
             numeric_stats = np.hstack(
                 (
@@ -276,6 +285,8 @@ def main(
                 allowed_charges=allowed_charges,
                 allow_charged_fragments=allow_charged_fragments,
                 allow_radical_electrons=allow_radical_electrons,
+                ignore_enantiomers=ignore_enantiomers,
+                ignore_isomerism=ignore_isomerism,
                 timeout=timeout,
             )
             numeric_stats = np.hstack(
@@ -305,9 +316,6 @@ def main(
                     numeric_columns += ["known_split"]
             string_statistics = [formulas, smiles]
             string_columns = ["chemical_formula", "smiles"]
-            if compute_chirality_smiles:
-                string_statistics += [chirality_smiles]
-                string_columns += ["chirality_smiles"]
             string_statistics = np.array(string_statistics).T
             np.savez(
                 results_path,
@@ -351,7 +359,11 @@ def main(
                     duplicating,
                     smiles_lookup,
                 ) = uniqueness_check_loop(
-                    validity=validity, smiles=smiles, formulas=formulas
+                    validity=validity,
+                    smiles=smiles,
+                    formulas=formulas,
+                    ignore_enantiomers=ignore_enantiomers,
+                    ignore_isomerism=ignore_isomerism,
                 )
             else:
                 unique = None
@@ -381,6 +393,8 @@ def main(
                     allowed_charges=allowed_charges,
                     allow_charged_fragments=allow_charged_fragments,
                     allow_radical_electrons=allow_radical_electrons,
+                    ignore_enantiomers=ignore_enantiomers,
+                    ignore_isomerism=ignore_isomerism,
                     timeout=timeout,
                 )
             else:
@@ -444,9 +458,7 @@ def validity_check_loop(
     numeric_stats,
     smiles,
     formulas,
-    chirality_smiles,
     compute_ring_statistics,
-    compute_chirality_smiles,
 ):
     i = loader.sampler.skip
     try:
@@ -460,8 +472,6 @@ def validity_check_loop(
                     numeric_stats[i, 4] = r["R6"]
                 smiles[i] = r["smiles"]
                 formulas[i] = r["formula"]
-                if compute_chirality_smiles:
-                    chirality_smiles[i] = r["chirality_smiles"]
                 i += 1
             pbar.update(batch_size)
     except RuntimeError:
@@ -474,6 +484,8 @@ def uniqueness_check_loop(
     validity,
     smiles,
     formulas,
+    ignore_enantiomers,
+    ignore_isomerism,
 ):
     unique = np.zeros(len(validity), dtype=bool)
     duplicating = np.ones(len(validity), dtype=int) * -1
@@ -483,13 +495,26 @@ def uniqueness_check_loop(
         if validity[i]:
             f = formulas[i]
             s = smiles[i]
+            if ignore_isomerism:
+                # remove isomerism from smiles
+                s = Chem.CanonSmiles(s, useChiral=False)
             if f not in smiles_lookup:
                 # molecule is unique
-                smiles_lookup[f] = {s: i}
+                if ignore_enantiomers and not ignore_isomerism:
+                    # also add smiles of mirror-image stereoisomer
+                    s2 = s.replace("@", "@@").replace("@@@@", "@")
+                    smiles_lookup[f] = {s: i, s2: i}
+                else:
+                    smiles_lookup[f] = {s: i}
                 unique[i] = 1
             elif s not in smiles_lookup[f]:
                 # molecule is unique
-                smiles_lookup[f].update({s: i})
+                if ignore_enantiomers and not ignore_isomerism:
+                    # also add smiles of mirror-image stereoisomer
+                    s2 = s.replace("@", "@@").replace("@@@@", "@")
+                    smiles_lookup[f].update({s: i, s2: i})
+                else:
+                    smiles_lookup[f].update({s: i})
                 unique[i] = 1
             else:
                 # molecule is not unique
@@ -511,6 +536,8 @@ def compare_with_db(
     allowed_charges,
     allow_charged_fragments,
     allow_radical_electrons,
+    ignore_enantiomers,
+    ignore_isomerism,
     timeout,
 ):
     if not Path(compare_db_path).exists():
@@ -553,6 +580,7 @@ def compare_with_db(
             allow_charged_fragments=allow_charged_fragments,
             allow_radical_electrons=allow_radical_electrons,
             timeout=timeout,
+            ignore_warnings=True,
         )
     # load split if provided
     if compare_db_split_path is not None:
@@ -605,12 +633,16 @@ def compare_with_db(
         validity=db_validity,
         smiles=db_smiles,
         formulas=db_formulas,
+        ignore_enantiomers=ignore_enantiomers,
+        ignore_isomerism=ignore_isomerism,
     )
     if unique is None or duplicating is None:
         unique, _, duplicating, _ = uniqueness_check_loop(
             validity=validity,
             smiles=smiles,
             formulas=formulas,
+            ignore_enantiomers=ignore_enantiomers,
+            ignore_isomerism=ignore_isomerism,
         )
     print(f"Running comparison...")
     known = np.ones(len(validity), dtype=int) * -1
@@ -623,6 +655,8 @@ def compare_with_db(
             if unique[i]:
                 s = smiles[i]
                 f = formulas[i]
+                if ignore_isomerism:
+                    s = Chem.CanonSmiles(s, useChiral=False)
                 if f in db_smiles_lookup and s in db_smiles_lookup[f]:
                     known_idx[i] = db_smiles_lookup[f][s]
                     known[i] = 1
@@ -667,9 +701,10 @@ if __name__ == "__main__":
         allowed_charges=args.allowed_charges,
         allow_charged_fragments=args.allow_charged_fragments,
         allow_radical_electrons=args.allow_radical_electrons,
-        compute_chirality_smiles=args.compute_chirality_smiles,
         compute_ring_statistics=args.compute_ring_statistics,
         force_recomputation=args.force_recomputation,
+        ignore_enantiomers=args.ignore_enantiomers,
+        ignore_isomerism=args.ignore_isomerism,
         compute_uniqueness=args.compute_uniqueness,
         compare_db_path=args.compare_db_path,
         compare_db_results_path=args.compare_db_results_path,

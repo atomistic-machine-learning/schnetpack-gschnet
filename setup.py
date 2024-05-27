@@ -35,7 +35,7 @@ setup(
         "hydra-colorlog>=1.1.0",
         "numpy",
         "ase>=3.21",
-        "rdkit>=2022.09.1",
+        "rdkit>=2023.09",
         "torchmetrics",
         "h5py",
         "tqdm",

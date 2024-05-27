@@ -43,7 +43,6 @@ class GetSmiles(Transform):
         allow_radical_electrons: Optional[bool] = False,
         return_inputs: Optional[bool] = True,
         store_validity: Optional[bool] = False,
-        store_chirality_smiles: Optional[bool] = False,
         store_chemical_formula: Optional[bool] = False,
         store_ring_statistics: Optional[bool] = False,
     ):
@@ -54,7 +53,6 @@ class GetSmiles(Transform):
             allow_radical_electrons:
             return_inputs:
             store_validity:
-            store_chirality_smiles:
             store_chemical_formula:
             store_ring_statistics:
         """
@@ -64,7 +62,6 @@ class GetSmiles(Transform):
         self.allow_radical_electrons = allow_radical_electrons
         self.return_inputs = return_inputs
         self.store_validity = store_validity
-        self.store_chirality_smiles = store_chirality_smiles
         self.store_chemical_formula = store_chemical_formula
         self.store_ring_statistics = store_ring_statistics
         if not self.allow_charged_fragments and 0 not in self.allowed_charges:
@@ -99,9 +96,9 @@ class GetSmiles(Transform):
             try:
                 rdDetermineBonds.DetermineBonds(
                     mol,
-                    charge=0,
+                    charge=charge,
                     allowChargedFragments=self.allow_charged_fragments,
-                    embedChiral=self.store_chirality_smiles,
+                    embedChiral=True,
                 )
                 mol = Chem.RemoveHs(mol)
                 if (
@@ -133,12 +130,6 @@ class GetSmiles(Transform):
                 results["validity"] = False
             else:
                 results["validity"] = True
-        if self.store_chirality_smiles:
-            if "@" in smiles:
-                results["smiles"] = smiles.replace("@", "")
-                results["chirality_smiles"] = smiles
-            else:
-                results["chirality_smiles"] = ""
         if self.store_chemical_formula:
             results["formula"] = formula
         if self.store_ring_statistics:

@@ -69,7 +69,7 @@ class GetNumTotalAtoms(Transform):
         self,
         inputs: Dict[str, torch.Tensor],
     ) -> Dict[str, torch.Tensor]:
-        # store the number of total atoms
+        # store the total number of atoms
         # the entry at properties.n_atoms is adapted when slicing molecules
         # _n_total_atoms will always store the amount of atoms in the full molecule
         inputs["_n_total_atoms"] = inputs[properties.n_atoms]

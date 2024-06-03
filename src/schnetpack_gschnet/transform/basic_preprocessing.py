@@ -40,7 +40,8 @@ class OrderByDistanceToOrigin(Transform):
 
 class GetNumHeavyAtoms(Transform):
     """
-    Extracts the number of heavy atoms in a molecule.
+    Extracts the number of heavy atoms in a molecule and stores it as
+    'n_heavy_atoms' in the inputs dictionary.
     """
 
     is_preprocessor: bool = True
@@ -53,13 +54,14 @@ class GetNumHeavyAtoms(Transform):
         # count number of hydrogen atoms
         n_Hs = torch.count_nonzero(inputs[properties.Z] == 1)
         # the number of heavy atoms is the number of atoms - number of hydrogens
-        inputs["_n_heavy_atoms"] = inputs[properties.n_atoms] - n_Hs
+        inputs["n_heavy_atoms"] = inputs[properties.n_atoms] - n_Hs
         return inputs
 
 
 class GetNumTotalAtoms(Transform):
     """
-    Extracts the total number of atoms in a molecule.
+    Extracts the total number of atoms in a molecule and stores it as
+    'n_total_atoms' in the inputs dictionary.
     """
 
     is_preprocessor: bool = True
@@ -72,7 +74,7 @@ class GetNumTotalAtoms(Transform):
         # store the total number of atoms
         # the entry at properties.n_atoms is adapted when slicing molecules
         # _n_total_atoms will always store the amount of atoms in the full molecule
-        inputs["_n_total_atoms"] = inputs[properties.n_atoms]
+        inputs["n_total_atoms"] = inputs[properties.n_atoms]
         return inputs
 
 
@@ -80,6 +82,7 @@ class GetComposition(Transform):
     """
     Extracts the number of atoms in a molecule that correspond to types from a given
     list of atom types.
+    The result is stored as 'composition' in the inputs dictionary.
     """
 
     is_preprocessor: bool = True
@@ -123,6 +126,7 @@ class GetRelativeAtomicEnergy(Transform):
     data set. We compute :math:`\hat{E}^Z` with linear regression from the atomic
     concentration. The weights and bias are learned using the training data or can
     optionally be supplied.
+    The result is stored as 'relative_atomic_energy' in the inputs dictionary.
     """
 
     is_preprocessor: bool = True

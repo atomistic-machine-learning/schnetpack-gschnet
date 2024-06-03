@@ -34,6 +34,37 @@ def get_parser():
         default=None,
     )
     parser.add_argument(
+        "--results_db_path",
+        help="Write a data base file containing only the filtered molecules to "
+        "this path. Use `--results_db_flags` to determine which molecules "
+        "are included in the db (e.g. only valid, only valid and unique "
+        "etc.). "
+        "CAUTION: If the file exists, the results will not be stored in "
+        "a data base. Always provide a path to a file that does not exist.",
+        default=None,
+        type=str,
+    )
+    parser.add_argument(
+        "--results_db_flags",
+        help="Determine which molecules are written to the results data base at "
+        "`--results_db_path`. Invalid molecules will always be excluded. "
+        "Further options are `unique` to only store unique molecules,"
+        "`unseen` to only store molecules that were not in the training/"
+        "validation sets, "
+        "and `novel` to only store molecules that were not in the training/"
+        "validation/test sets."
+        "CAUTION: When using `unique`, the option `--compute_uniqueness` has "
+        "to be set."
+        "When using `novel`, the training data base has to be "
+        "provided with `--compare_db_path`. When using `unseen`, the training "
+        "data base has to be provided with `--compare_db_path` and, "
+        "additionally, the split file used for training has to be provided "
+        "with `--compare_db_split_path`.",
+        default=[],
+        type=str,
+        nargs="*",
+    )
+    parser.add_argument(
         "--timeout",
         help="A timeout in seconds. If the validity check cannot be completed "
         "within this timeframe, the molecule is marked as invalid. Set to "
@@ -137,7 +168,7 @@ def get_parser():
         action="store_true",
     )
     parser.add_argument(
-        "--write_to_db",
+        "--write_to_input_db",
         help="If set, the validity value (True or False) and the obtained smiles "
         "string are written to the input data base. "
         "The validity can be found as row.data['validity'] while the smiles is "
@@ -153,6 +184,8 @@ def get_parser():
 def main(
     data_path,
     results_path=None,
+    results_db_path=None,
+    results_db_flags=[],
     allowed_charges=[
         0,
     ],
@@ -167,7 +200,7 @@ def main(
     compare_db_results_path=None,
     compare_db_split_path=None,
     timeout=5,
-    write_to_db=False,
+    write_to_input_db=False,
     ignore_warnings=False,
 ):
     db_path = Path(data_path)
@@ -410,15 +443,20 @@ def main(
         print(f"Of these, {n_unique} molecules are unique.")
         if compare_db_path is not None:
             # exclude non-unique
-            known = known[unique.astype(bool)]
+            _known = known[unique.astype(bool)]
             if compare_db_split_path is not None:
-                known_split = known_split[unique.astype(bool)]
+                _known_split = known_split[unique.astype(bool)]
+    else:
+        if compare_db_path is not None:
+            _known = known
+            if compare_db_split_path is not None:
+                _known_split = known_split
     if compare_db_path is not None:
         if compare_db_split_path is not None:
-            n_novel = np.sum(known_split == 0)
-            n_train = np.sum(known_split == 1)
-            n_val = np.sum(known_split == 2)
-            n_test = np.sum(known_split == 3)
+            n_novel = np.sum(_known_split == 0)
+            n_train = np.sum(_known_split == 1)
+            n_val = np.sum(_known_split == 2)
+            n_test = np.sum(_known_split == 3)
             print(
                 f"Of these, {n_train} (training) + {n_val} (validation) = "
                 f"{n_train + n_val} structures resemble molecules that were used "
@@ -427,16 +465,17 @@ def main(
                 f"structures are unseen molecules that were not used for training."
             )
         else:
-            n_novel = np.sum(known == 0)
-            n_known = np.sum(known == 1)
+            n_novel = np.sum(_known == 0)
+            n_known = np.sum(_known == 1)
             print(
                 f"Of these, {n_known} molecules resemble structures from "
                 f"{compare_db_path}."
-                f"\n{n_novel} molecules were not found in that data base."
+                f"\n{n_novel} are novel molecules that were not found in that data "
+                f"base."
             )
 
-    if write_to_db:
-        print(f"\nWriting validity values of molecules to db at {db_path}.")
+    if write_to_input_db:
+        print(f"\nWriting validity of molecules to the input db at {db_path}.")
         with connect(db_path) as con:
             md = con.metadata
             if "validity" not in md["_property_unit_dict"]:
@@ -447,6 +486,89 @@ def main(
                 data = row.data
                 data["validity"] = np.array([validity[i]], dtype=bool)
                 con.update(row.id, data=data, smiles=smiles[i])
+
+    if results_db_path is not None:
+        results_db_path = Path(results_db_path)
+        if results_db_path.exists():
+            print(
+                f"\nCAUTION: There already exists a data base at "
+                f"{results_db_path}!\n"
+                f"Will not write the results to a data base. Please specify a path "
+                f"to a file that does not yet exist."
+            )
+        else:
+            # check that the provided arguments meet the requirements of the flags
+            if "unique" in results_db_flags and not compute_uniqueness:
+                print(
+                    f"\nCAUTION: Expected `--compute_uniqueness` since you set `unique` "
+                    f"in `--results_db_flags`.\nThe writing of the results to "
+                    f"{results_db_path} is aborted."
+                )
+                return validity, smiles, formulas
+            if "novel" in results_db_flags and compare_db_path is None:
+                print(
+                    f"\nCAUTION: Expected `--compare_db_path` since you set `novel` "
+                    f"in `--results_db_flags`.\nThe writing of the results to "
+                    f"{results_db_path} is aborted."
+                )
+                return validity, smiles, formulas
+            if "unseen" in results_db_flags and (
+                compare_db_path is None or compare_db_split_path is None
+            ):
+                print(
+                    f"\nCAUTION: Expected `--compare_db_path` and "
+                    f"`--compare_db_split_path` since you set `unseen` "
+                    f"in `--results_db_flags`.\nThe writing of the results to "
+                    f"{results_db_path} is aborted."
+                )
+                return validity, smiles, formulas
+            # make a string that contains all flags (+ valid which is always enabled)
+            flags = "valid"
+            if len(results_db_flags) > 0:
+                flags = ", ".join(([flags] + results_db_flags)[:-1])
+                flags += f" and {results_db_flags[-1]}"
+            print(
+                f"\nWriting {flags} molecules to a new data base at "
+                f"{results_db_path}."
+            )
+            with connect(results_db_path) as target:
+                with connect(db_path) as source:
+                    # write metadata of new data base
+                    prop_unit_dict = source.metadata["_property_unit_dict"]
+                    prop_unit_dict.update({"original_index": ""})
+                    target.metadata = {
+                        "original_data_base_path": str(db_path),
+                        "filter_flags": flags,
+                        "settings": {
+                            "allowed_charges": allowed_charges,
+                            "allow_charged_fragments": allow_charged_fragments,
+                            "allow_radical_electrons": allow_radical_electrons,
+                            "ignore_enantiomers": ignore_enantiomers,
+                            "ignore_isomerism": ignore_isomerism,
+                            "timeout": timeout,
+                        },
+                        "_property_unit_dict": prop_unit_dict,
+                        "_distance_unit": source.metadata["_distance_unit"],
+                    }
+                    # check which molecules to write according to flags
+                    mask = validity == 1
+                    if "unique" in results_db_flags:
+                        mask = np.logical_and(mask, unique == 1)
+                    if "unseen" in results_db_flags:
+                        mask = np.logical_and(
+                            mask,
+                            np.logical_or(known_split == 0, known_split == 3),
+                        )
+                    elif "novel" in results_db_flags:
+                        mask = np.logical_and(mask, known == 0)
+                    idcs = np.nonzero(mask)[0]
+                    # write molecules
+                    for idx in tqdm(idcs):
+                        mol = source.get(int(idx) + 1)
+                        data = mol.data
+                        data["original_index"] = np.array([idx], dtype=int)
+                        target.write(mol.toatoms(), data=mol.data, smiles=smiles[idx])
+            print(f"DONE. Wrote {len(idcs)} {flags} molecules to the new data base.\n")
 
     return validity, smiles, formulas
 
@@ -698,6 +820,8 @@ if __name__ == "__main__":
     main(
         data_path=args.data_path,
         results_path=args.results_path,
+        results_db_path=args.results_db_path,
+        results_db_flags=args.results_db_flags,
         allowed_charges=args.allowed_charges,
         allow_charged_fragments=args.allow_charged_fragments,
         allow_radical_electrons=args.allow_radical_electrons,
@@ -710,5 +834,5 @@ if __name__ == "__main__":
         compare_db_results_path=args.compare_db_results_path,
         compare_db_split_path=args.compare_db_split_path,
         timeout=args.timeout,
-        write_to_db=args.write_to_db,
+        write_to_input_db=args.write_to_input_db,
     )

@@ -690,6 +690,8 @@ class ConnectivityCheck(Transform):
         if np.count_nonzero(n_nbh == 0) > 0:
             if self.return_inputs:
                 inputs["connected"] = torch.tensor([False], dtype=torch.bool)
+                inputs["connectivity_idx_i"] = _idx_i
+                inputs["connectivity_idx_j"] = _idx_j
                 return inputs
             else:
                 return False
@@ -715,6 +717,8 @@ class ConnectivityCheck(Transform):
         connected = count == n_atoms  # molecule is connected if we saw all atoms
         if self.return_inputs:
             inputs["connected"] = torch.tensor([connected], dtype=torch.bool)
+            inputs["connectivity_idx_i"] = _idx_i
+            inputs["connectivity_idx_j"] = _idx_j
             return inputs
         else:
             return connected

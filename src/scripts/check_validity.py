@@ -11,6 +11,7 @@ from rdkit import Chem
 
 from schnetpack.data import load_dataset, AtomsDataFormat, AtomsLoader
 from schnetpack_gschnet.transform import GetSmiles
+from schnetpack_gschnet.data import GenerativeAtomsDataModule
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger(__name__)
@@ -26,7 +27,7 @@ def get_parser():
         "if provided. "
         "Set `--results_path auto` to automatically generate the path "
         "from `data_path` by appending '_validity_statistics.npz' to the data "
-        "base filename."
+        "base filename. "
         "CAUTION: If the file already exists, the statistics are instead"
         "loaded from that file. In order to force a recomputation, set"
         "`--force_recomputation` (which will overwrite the existing file).",
@@ -39,6 +40,9 @@ def get_parser():
         "this path. Use `--results_db_flags` to determine which molecules "
         "are included in the db (e.g. only valid, only valid and unique "
         "etc.). "
+        "Set `--results_db_path auto` to automatically generate the path "
+        "from `data_path` by appending '_filtered.db' to the data base "
+        " filename. "
         "CAUTION: If the file exists, the results will not be stored in "
         "a data base. Always provide a path to a file that does not exist.",
         default=None,
@@ -488,7 +492,10 @@ def main(
                 con.update(row.id, data=data, smiles=smiles[i])
 
     if results_db_path is not None:
-        results_db_path = Path(results_db_path)
+        if results_db_path == "auto":
+            results_db_path = db_path.with_name(db_path.stem + "_filtered.db")
+        else:
+            results_db_path = Path(results_db_path)
         if results_db_path.exists():
             print(
                 f"\nCAUTION: There already exists a data base at "
@@ -538,7 +545,7 @@ def main(
                     prop_unit_dict.update({"original_index": ""})
                     target.metadata = {
                         "original_data_base_path": str(db_path),
-                        "filter_flags": flags,
+                        "filter_flags": ["valid"] + results_db_flags,
                         "settings": {
                             "allowed_charges": allowed_charges,
                             "allow_charged_fragments": allow_charged_fragments,
@@ -567,7 +574,7 @@ def main(
                         mol = source.get(int(idx) + 1)
                         data = mol.data
                         data["original_index"] = np.array([idx], dtype=int)
-                        target.write(mol.toatoms(), data=mol.data, smiles=smiles[idx])
+                        target.write(mol.toatoms(), data=data, smiles=smiles[idx])
             print(f"DONE. Wrote {len(idcs)} {flags} molecules to the new data base.\n")
 
     return validity, smiles, formulas
@@ -722,24 +729,29 @@ def compare_with_db(
             with connect(compare_db_path) as con:
                 # look for subset in data base
                 md = con.metadata
-                if "disconnected_idx" not in md or key not in md["disconnected_idx"]:
-                    raise RuntimeError(
-                        f"Cannot match indices provided in the split file with "
-                        f"indices from the data base. The provided split file "
-                        f"({compare_db_split_path}) was sampled with the setting "
-                        f"{key} (placement_cutoff/use_covalent_radii/"
-                        f"covalent_radius_factor). However, the setting cannot be "
-                        f"found in the metadata of the data base "
-                        f"({compare_db_path})."
-                    )
+            if "disconnected_idx" not in md or key not in md["disconnected_idx"]:
+                _data = GenerativeAtomsDataModule(
+                    datapath=compare_db_path,
+                    batch_size=1,
+                    placement_cutoff=float(split["placement_cutoff"]),
+                    use_covalent_radii=bool(split["use_covalent_radii"]),
+                    covalent_radius_factor=float(split["covalent_radius_factor"]),
+                    num_train=1,
+                    num_val=1,
+                    split_file=None,
+                    format=AtomsDataFormat.ASE,
+                )
+                _data.setup()
+                excluded = _data.dataset.metadata["disconnected_idx"][key]
+            else:
                 excluded = md["disconnected_idx"][key]
-                mask = np.ones(len(db_validity), dtype=bool)
-                mask[excluded] = 0
-                index_map = np.nonzero(mask)[0]
-                # map subset indices back to global indices of the data base
-                train_set = index_map[train_set]
-                val_set = index_map[val_set]
-                test_set = index_map[test_set]
+            mask = np.ones(len(db_validity), dtype=bool)
+            mask[excluded] = 0
+            index_map = np.nonzero(mask)[0]
+            # map subset indices back to global indices of the data base
+            train_set = index_map[train_set]
+            val_set = index_map[val_set]
+            test_set = index_map[test_set]
         # store the set in which molecules are (1=train, 2=val, 3=test)
         train_val_test = np.zeros(len(db_validity), dtype=int)
         train_val_test[train_set] = 1

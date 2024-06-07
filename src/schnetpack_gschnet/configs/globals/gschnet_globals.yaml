@@ -1,0 +1,23 @@
+defaults:
+  - default_globals
+  - _self_
+
+name: ???                       # name of the experiment (parent directory of globals.id)
+id: ???                         # name of the directory where results of the run are stored
+model_cutoff: ???               # cutoff applied in SchNet during feature extraction
+prediction_cutoff: ???          # cutoff to select which atoms are used for prediction
+placement_cutoff: ???           # cutoff to used in the slicing of training molecules
+atom_types: ???                 # list of atom types that appear in the data set
+use_covalent_radii: True        # whether to use covalent radii on top of the placement_cutoff
+covalent_radius_factor: 1.1     # the factor for scaling covalent radii
+origin_type: 121                # the artificial type of the origin token (cannot appear in atom_types)
+focus_type: 122                 # the artificial type of the focus token (cannot appear in atom_types)
+stop_type: 123                  # the artificial type of the stop token (cannot appear in atom_types)
+lr: 1e-4                        # the initial learning rate (lr) for training
+lr_decay_factor: 0.5            # the factor by which the lr is decayed
+lr_patience: 10                 # number of epochs without improvemed validation loss until lr is decayed
+min_lr: 1e-6                    # lower bound on the value of the lr
+draw_random_samples: 10         # number of generation steps randomly drawn for training when slicing a molecule
+data_workdir: null              # working directory where the data is temporarily stored (e.g. fast storage)
+cache_workdir: null             # working directory where the cache is temporarily stored (e.g. fast storage)
+model_path: "best_model"        # file where to store the final model after training

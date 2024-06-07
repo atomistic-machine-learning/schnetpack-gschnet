@@ -1,0 +1,35 @@
+# @package _global_
+
+defaults:
+  - override /run: gschnet_run
+  - override /globals: gschnet_globals
+  - override /data: custom_data
+  - override /task: gschnet_task
+  - override /callbacks: gschnet_callbacks
+  - override /model: gschnet
+  - override /model/conditioning: null
+  - _self_
+
+globals:
+  name: ???                # name of the experiment (parent directory of globals.id)
+  id: ???                  # name of the directory where results of the run are stored
+  model_cutoff: ???        # cutoff applied in SchNet during feature extraction
+  prediction_cutoff: ???   # cutoff to select which atoms are used for prediction
+  placement_cutoff: ???    # cutoff to used in the slicing of training molecules
+  atom_types: ???          # list of atom types that appear in the data set
+  use_covalent_radii: True
+  covalent_radius_factor: 1.1
+  draw_random_samples: 10
+  data_workdir: null
+  cache_workdir: null
+
+data:
+  datapath: ???    # path to the custom data base
+  num_train: ???   # number of molecules used for training
+  num_val: ???     # number of molecules used for validation (rest -> test)
+  batch_size: 10
+
+model:
+  representation:
+    n_atom_basis: 128
+    n_interactions: 9

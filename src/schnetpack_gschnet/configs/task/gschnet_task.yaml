@@ -1,11 +1,12 @@
 defaults:
   - optimizer: adam
   - scheduler: reduce_on_plateau
+  - _self_
 
 _target_: schnetpack_gschnet.ConditionalGenerativeSchNetTask
 scheduler_args:
   mode: min
-  factor: 0.5
-  patience: 10
-  min_lr: 1e-6
+  factor: ${globals.lr_decay_factor}
+  patience: ${globals.lr_patience}
+  min_lr: ${globals.min_lr}
   smoothing_factor: 0.0

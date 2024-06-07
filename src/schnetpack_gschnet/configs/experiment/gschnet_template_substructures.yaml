@@ -1,20 +1,14 @@
 # @package _global_
 
 defaults:
-  - override /data: template
+  - override /run: gschnet_run
+  - override /globals: gschnet_globals
+  - override /data: custom_data
   - override /task: gschnet_task
-  - override /callbacks:
-      - checkpoint
-      - earlystopping
-      - lrmonitor
-      - progressbar
-      - modelsummary
+  - override /callbacks: gschnet_callbacks
   - override /model: gschnet
   - override /model/conditioning: null
-
-run:
-  path: ${run.work_dir}/models/${globals.name}
-  id: ${globals.id}
+  - _self_
 
 globals:
   name: ???                     # name of the experiment (parent directory of globals.id)
@@ -38,8 +32,6 @@ callbacks:
     patience: 25
   progress_bar:
     refresh_rate: 100
-  model_summary:
-    max_depth: -1
 
 data:
   transforms:
@@ -48,7 +40,6 @@ data:
       model_cutoff: ${globals.model_cutoff}
       prediction_cutoff: ${globals.prediction_cutoff}
       placement_cutoff: ${globals.placement_cutoff}
-      environment_provider: matscipy
       use_covalent_radii: ${globals.use_covalent_radii}
       covalent_radius_factor: ${globals.covalent_radius_factor}
     - _target_: schnetpack_gschnet.transform.GetRandomSubstructure

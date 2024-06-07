@@ -1,6 +1,8 @@
 # @package _global_
 
 defaults:
+  - override /run: gschnet_run
+  - override /globals: gschnet_globals
   - override /data: gschnet_qm9
   - override /task: gschnet_task
   - override /callbacks:
@@ -11,6 +13,7 @@ defaults:
       - modelsummary
   - override /model: gschnet
   - override /model/conditioning: comp_relenergy
+  - _self_
 
 run:
   path: ${run.work_dir}/models/qm9_${globals.name}

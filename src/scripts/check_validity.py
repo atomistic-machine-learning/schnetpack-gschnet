@@ -730,6 +730,7 @@ def compare_with_db(
                 # look for subset in data base
                 md = con.metadata
             if "disconnected_idx" not in md or key not in md["disconnected_idx"]:
+                # compute subset if the key does not exist
                 _data = GenerativeAtomsDataModule(
                     datapath=compare_db_path,
                     batch_size=1,
@@ -744,6 +745,7 @@ def compare_with_db(
                 _data.setup()
                 excluded = _data.dataset.metadata["disconnected_idx"][key]
             else:
+                # load the subset if key exists
                 excluded = md["disconnected_idx"][key]
             mask = np.ones(len(db_validity), dtype=bool)
             mask[excluded] = 0

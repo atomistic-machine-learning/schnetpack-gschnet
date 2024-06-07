@@ -50,9 +50,9 @@ class ConditionalGenerativeSchNet(AtomisticModel):
         distance_prediction_n_layers: int = 5,
         distance_prediction_n_hidden: List[int] = None,
         distance_prediction_activation: Callable = shifted_softplus,
-        distance_prediction_n_bins: int = 301,
         distance_prediction_min_dist: float = 0.0,
-        distance_prediction_max_dist: float = 15.0,
+        distance_prediction_max_dist: Optional[float] = None,
+        distance_prediction_n_bins: Optional[int] = None,
         postprocessors: Optional[List[Transform]] = None,
         input_dtype_str: str = "float32",
         do_postprocessing: bool = False,
@@ -96,13 +96,18 @@ class ConditionalGenerativeSchNet(AtomisticModel):
                 of features from the conditioning module).
             distance_prediction_activation: Activation function used in the distance
                 prediction network after all but the last layer.
-            distance_prediction_n_bins: Number of bins (i.e. output neurons) for the
-                distance prediction network.
             distance_prediction_min_dist: Minimum distance covered by the bins of the
                 discretized distance distribution.
             distance_prediction_max_dist: Maximum distance covered by the bins of the
                 discretized distance distribution (all larger distances are mapped to
                 the last bin).
+                If `None`, it is set to `prediction_cutoff` + `placement_cutoff`.
+                This is the furthest possible distance between atoms within the
+                prediction_cutoff and and the next atom.
+            distance_prediction_n_bins: Number of bins (i.e. output neurons) for the
+                distance prediction network.
+                If `None`, it is set to ceil(`distance_prediction_max_dist` * 30) + 1,
+                which leads to bins with a width of 1/30≈0.033 (of the distance unit).
             postprocessors: Post-processing transforms that may be initialized using the
                 `datamodule`, but are not applied during training.
             input_dtype_str: The dtype of real inputs as string.
@@ -156,12 +161,18 @@ class ConditionalGenerativeSchNet(AtomisticModel):
         n_features = representation.n_atom_basis + int(self.n_conditional_features)
         self.register_buffer("n_features", torch.tensor(n_features, dtype=torch.long))
 
+        if distance_prediction_max_dist is None:
+            distance_prediction_max_dist = prediction_cutoff + placement_cutoff
+        if distance_prediction_n_bins is None:
+            distance_prediction_n_bins = (
+                math.ceil(distance_prediction_max_dist * 30) + 1
+            )
+        self.register_buffer("distance_min", torch.tensor(distance_prediction_min_dist))
+        self.register_buffer("distance_max", torch.tensor(distance_prediction_max_dist))
         self.register_buffer(
             "n_distance_bins",
             torch.tensor(distance_prediction_n_bins, dtype=torch.long),
         )
-        self.register_buffer("distance_min", torch.tensor(distance_prediction_min_dist))
-        self.register_buffer("distance_max", torch.tensor(distance_prediction_max_dist))
         self.register_buffer(
             "distance_bin_width",
             (self.distance_max - self.distance_min) / (self.n_distance_bins - 1),

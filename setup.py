@@ -25,7 +25,10 @@ setup(
     package_dir={"": "src"},
     version="1.0.0",
     author="Niklas Gebauer",
-    scripts=[],
+    scripts=[
+        "src/scripts/gschnet_train",
+        "src/scripts/gschnet_generate",
+    ],
     include_package_data=True,
     install_requires=[
         "schnetpack>=2.0.3",

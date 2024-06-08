@@ -17,6 +17,9 @@ representation:
     cutoff: ${globals.model_cutoff}
   max_z: 130
 
+distance_prediction_max_dist: null
+distance_prediction_n_bins: null
+
 atom_types: ${globals.atom_types}
 origin_type: ${globals.origin_type}
 focus_type: ${globals.focus_type}

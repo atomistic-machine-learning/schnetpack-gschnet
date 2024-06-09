@@ -664,8 +664,8 @@ class CompositionEmbedding(ConditionEmbedding):
             n_features_n_atoms: The number of features in the embedding of the total
                 number of atoms.
             n_layers_n_atoms: The number of layers in the fully connected network that
-            maps from the Gaussian rbf
-                expansion of the number of atoms to the embedding vector.
+                maps from the Gaussian rbf expansion of the number of atoms to the
+                embedding vector.
             condition_min_n_atoms: Minimum value for the Gaussian rbf expansion of the
                 number of atoms.
             condition_max_n_atoms: Maximum value for the Gaussian rbf expansion of the

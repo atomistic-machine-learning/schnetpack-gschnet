@@ -5,8 +5,6 @@ placement_cutoff: ${globals.placement_cutoff}
 use_covalent_radii: ${globals.use_covalent_radii}
 covalent_radius_factor: ${globals.covalent_radius_factor}
 num_workers: 8
-num_val_workers: 4
-num_test_workers: 4
 
 datapath: ???    # path to the custom data base
 batch_size: ???  # number of molecules per batch for training

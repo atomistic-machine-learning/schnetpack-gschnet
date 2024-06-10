@@ -1,16 +1,28 @@
 # @package _global_
 defaults:
-  - generate: default_generate
   - _self_
+  - generate: default_generate
 
 modeldir: ???
-outputfile: null
-workdir: null
-remove_workdir: False
+n_molecules: ???
+batch_size: ???
+max_n_atoms: ???
+
+conditions: null
 
 use_gpu: True
-print_config: True
+outputfile: null
 view_molecules: False
+workdir: null
+remove_workdir: False
+print_config: True
+
+grid_distance_min: 0.7
+grid_spacing: 0.05
+temperature_term: 0.1
+grid_batch_size: ${batch_size}
+
+start_from_substructure: False
 
 debug:
   run: False
@@ -19,7 +31,7 @@ debug:
 
 settings:
   conditions:
-    trajectory: ${generate.conditions}
+    trajectory: ${conditions}
 
 # hydra configuration
 hydra:

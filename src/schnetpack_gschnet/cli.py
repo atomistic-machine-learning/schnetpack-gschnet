@@ -54,9 +54,23 @@ def generate(config: DictConfig):
         print_config(
             config,
             resolve=False,
-            fields=("modeldir", "generate")
+            fields=(
+                "modeldir",
+                "n_molecules",
+                "batch_size",
+                "max_n_atoms",
+                "conditions",
+            )
             if config.workdir is None
-            else ("modeldir", "workdir", "remove_workdir", "generate"),
+            else (
+                "modeldir",
+                "workdir",
+                "remove_workdir",
+                "n_molecules",
+                "batch_size",
+                "max_n_atoms",
+                "conditions",
+            ),
         )
 
     with connect(outputfile) as con:
@@ -105,12 +119,11 @@ def generate(config: DictConfig):
                     f"using the distance unit `{distance_unit}`. "
                     f"Please specify a different output file."
                 )
-        print(con.metadata)
 
     # parse composition (if it is included in conditions)
-    if "conditions" not in config.generate:
+    if "conditions" not in config:
         with open_dict(config):
-            config.generate.conditions = {}
+            config.conditions = {}
     original_conditions = OmegaConf.to_container(
         config.settings.conditions.trajectory, resolve=True
     )
@@ -119,16 +132,16 @@ def generate(config: DictConfig):
     )
 
     # compute number of required batches
-    n_batches = int(np.ceil(config.generate.n_molecules / config.generate.batch_size))
+    n_batches = int(np.ceil(config.n_molecules / config.batch_size))
     if config.debug.run:
-        n_batches = config.generate.n_molecules
+        n_batches = config.n_molecules
         log.info(
             f"Caution: Using debug version of the generation function. The batch size "
             f"is automatically set to 1."
         )
 
     # extract substructures to start from (if any)
-    if config.generate.start_from_substructure:
+    if config.start_from_substructure:
         if config.debug.run:
             raise ValueError(
                 f"Generation from substructures cannot be run in debug "
@@ -136,40 +149,54 @@ def generate(config: DictConfig):
                 f"'generate.start_from_substructure'."
             )
         else:
-            substructures = load_substructures(config.generate.substructure)
+            substructures = load_substructures(config.substructure)
             orig_n_batchs = n_batches
             if len(substructures) > 1:
                 log.info(
-                    f"Generating {config.generate.n_molecules} molecules for each of "
+                    f"Generating {config.n_molecules} molecules for each of "
                     f"the {len(substructures)} selected substructures."
                 )
                 n_batches *= len(substructures)
-                config.generate.n_molecules *= len(substructures)
+                config.n_molecules *= len(substructures)
+
+    # check if conditions were provided that the model is not trained on
+    condition_names = model.get_condition_names()
+    for condition_type in config.settings.conditions:
+        for condition_name in config.settings.conditions[condition_type]:
+            if (
+                condition_names[condition_type] is None
+                or condition_name not in condition_names[condition_type]
+            ):
+                log.warn(
+                    f"The condition `{condition_name}` was provided but the "
+                    f"model has not been trained with this condition. The provided "
+                    f"value will be ignored during generation!"
+                )
 
     # generate molecules in batches
     log.info(
-        f"Generating {config.generate.n_molecules} molecules in {n_batches} batches! "
+        f"Generating {config.n_molecules} molecules in {n_batches} batches! "
         f'Running on device "{device}".'
     )
     ats = []
     with connect(outputfile) as con:
         for i in tqdm(range(n_batches)):
             # generate
-            remaining = config.generate.n_molecules - i * config.generate.batch_size
+            remaining = config.n_molecules - i * config.batch_size
             with torch.no_grad():
                 if config.debug.run:
                     R, Z, finished_list, n_tokens = generate_molecules_debug(
                         model=model,
-                        max_n_atoms=config.generate.max_n_atoms,
-                        grid_distance_min=config.generate.grid_distance_min,
-                        grid_spacing=config.generate.grid_spacing,
+                        max_n_atoms=config.max_n_atoms,
+                        grid_distance_min=config.grid_distance_min,
+                        grid_spacing=config.grid_spacing,
                         conditions=config.settings.conditions,
                         device=device,
-                        t=config.generate.temperature_term,
+                        t=config.temperature_term,
                         print_progress=config.debug.print_progress,
                         view_progress=config.debug.view_progress,
                     )
-                elif config.generate.start_from_substructure:
+                elif config.start_from_substructure:
                     substructure = substructures[int(i / orig_n_batchs)]
                     (
                         R,
@@ -179,26 +206,26 @@ def generate(config: DictConfig):
                     ) = generate_molecules_from_substructure(
                         model=model,
                         substructure=substructure,
-                        n_molecules=min(config.generate.batch_size, remaining),
-                        max_n_atoms=config.generate.max_n_atoms,
-                        grid_distance_min=config.generate.grid_distance_min,
-                        grid_spacing=config.generate.grid_spacing,
+                        n_molecules=min(config.batch_size, remaining),
+                        max_n_atoms=config.max_n_atoms,
+                        grid_distance_min=config.grid_distance_min,
+                        grid_spacing=config.grid_spacing,
                         conditions=config.settings.conditions,
                         device=device,
-                        t=config.generate.temperature_term,
-                        grid_batch_size=config.generate.grid_batch_size,
+                        t=config.temperature_term,
+                        grid_batch_size=config.grid_batch_size,
                     )
                 else:
                     R, Z, finished_list, n_tokens = generate_molecules(
                         model=model,
-                        n_molecules=min(config.generate.batch_size, remaining),
-                        max_n_atoms=config.generate.max_n_atoms,
-                        grid_distance_min=config.generate.grid_distance_min,
-                        grid_spacing=config.generate.grid_spacing,
+                        n_molecules=min(config.batch_size, remaining),
+                        max_n_atoms=config.max_n_atoms,
+                        grid_distance_min=config.grid_distance_min,
+                        grid_spacing=config.grid_spacing,
                         conditions=config.settings.conditions,
                         device=device,
-                        t=config.generate.temperature_term,
-                        grid_batch_size=config.generate.grid_batch_size,
+                        t=config.temperature_term,
+                        grid_batch_size=config.grid_batch_size,
                     )
 
                 # store generated molecules in db
@@ -224,9 +251,9 @@ def generate(config: DictConfig):
                     .cpu()
                     .numpy()
                     .tolist(),
-                    "max_n_atoms": config.generate.max_n_atoms,
-                    "grid_distance_min": config.generate.grid_distance_min,
-                    "grid_spacing": config.generate.grid_spacing,
+                    "max_n_atoms": config.max_n_atoms,
+                    "grid_distance_min": config.grid_distance_min,
+                    "grid_spacing": config.grid_spacing,
                 }
             }
         )

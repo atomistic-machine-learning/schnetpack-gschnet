@@ -15,7 +15,7 @@ transforms:
   - _target_: schnetpack.transform.SubtractCenterOfMass
   - _target_: schnetpack_gschnet.transform.OrderByDistanceToOrigin
   - _target_: schnetpack_gschnet.transform.GeneralCachedNeighborList
-    cache_path: ${run.work_dir}/cache
+    cache_path: ${run.path}/${run.id}/cache
     keep_cache: False
     cache_workdir: ${globals.cache_workdir}
     neighbor_list:

@@ -1,0 +1,7 @@
+defaults:
+  - default_run
+  - _self_
+
+path: ${run.work_dir}/models/${globals.name}
+id: ${globals.id}
+experiment: ${globals.name}

@@ -1,0 +1,7 @@
+defaults:
+  - default_trainer
+  - _self_
+
+accelerator: auto
+max_epochs: 1000
+enable_model_summary: False

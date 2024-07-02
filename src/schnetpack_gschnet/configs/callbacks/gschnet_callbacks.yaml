@@ -1,0 +1,10 @@
+defaults:
+  - checkpoint
+  - earlystopping
+  - lrmonitor
+  - progressbar
+  - modelsummary
+  - _self_
+
+early_stopping:
+  patience: 25

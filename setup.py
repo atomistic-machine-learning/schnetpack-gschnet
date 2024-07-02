@@ -25,7 +25,10 @@ setup(
     package_dir={"": "src"},
     version="1.0.0",
     author="Niklas Gebauer",
-    scripts=[],
+    scripts=[
+        "src/scripts/gschnet_train",
+        "src/scripts/gschnet_generate",
+    ],
     include_package_data=True,
     install_requires=[
         "schnetpack>=2.0.3",
@@ -35,6 +38,7 @@ setup(
         "hydra-colorlog>=1.1.0",
         "numpy",
         "ase>=3.21",
+        "rdkit>=2023.09",
         "torchmetrics",
         "h5py",
         "tqdm",

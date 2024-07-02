@@ -1,0 +1,33 @@
+_target_: schnetpack_gschnet.data.GenerativeAtomsDataModule
+
+data_workdir: ${globals.data_workdir}  # is specified in yaml-file of the experiment
+placement_cutoff: ${globals.placement_cutoff}
+use_covalent_radii: ${globals.use_covalent_radii}
+covalent_radius_factor: ${globals.covalent_radius_factor}
+num_workers: 8
+
+datapath: ???    # path to the custom data base
+batch_size: ???  # number of molecules per batch for training
+num_train: ???   # number of molecules used for training
+num_val: ???     # number of molecules used for validation (rest is put into test split)
+
+transforms:
+  - _target_: schnetpack.transform.SubtractCenterOfMass
+  - _target_: schnetpack_gschnet.transform.OrderByDistanceToOrigin
+  - _target_: schnetpack_gschnet.transform.GeneralCachedNeighborList
+    cache_path: ${run.path}/${run.id}/cache
+    keep_cache: False
+    cache_workdir: ${globals.cache_workdir}
+    neighbor_list:
+      _target_: schnetpack_gschnet.transform.ConditionalGSchNetNeighborList
+      model_cutoff: ${globals.model_cutoff}
+      prediction_cutoff: ${globals.prediction_cutoff}
+      placement_cutoff: ${globals.placement_cutoff}
+      use_covalent_radii: ${globals.use_covalent_radii}
+      covalent_radius_factor: ${globals.covalent_radius_factor}
+  - _target_: schnetpack_gschnet.transform.BuildAtomsTrajectory
+    origin_type: ${globals.origin_type}
+    focus_type: ${globals.focus_type}
+    stop_type: ${globals.stop_type}
+    draw_random_samples: ${globals.draw_random_samples}
+  - _target_: schnetpack.transform.CastTo32

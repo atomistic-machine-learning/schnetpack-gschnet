@@ -8,8 +8,11 @@ logger = logging.getLogger(__name__)
 
 __all__ = [
     "OrderByDistanceToOrigin",
+    "GetNumHeavyAtoms",
+    "GetNumTotalAtoms",
     "GetComposition",
     "GetRelativeAtomicEnergy",
+    "GetRandomSubstructure",
 ]
 
 
@@ -35,10 +38,51 @@ class OrderByDistanceToOrigin(Transform):
         return inputs
 
 
+class GetNumHeavyAtoms(Transform):
+    """
+    Extracts the number of heavy atoms in a molecule and stores it as
+    'n_heavy_atoms' in the inputs dictionary.
+    """
+
+    is_preprocessor: bool = True
+    is_postprocessor: bool = False
+
+    def forward(
+        self,
+        inputs: Dict[str, torch.Tensor],
+    ) -> Dict[str, torch.Tensor]:
+        # count number of hydrogen atoms
+        n_Hs = torch.count_nonzero(inputs[properties.Z] == 1)
+        # the number of heavy atoms is the number of atoms - number of hydrogens
+        inputs["n_heavy_atoms"] = inputs[properties.n_atoms] - n_Hs
+        return inputs
+
+
+class GetNumTotalAtoms(Transform):
+    """
+    Extracts the total number of atoms in a molecule and stores it as
+    'n_total_atoms' in the inputs dictionary.
+    """
+
+    is_preprocessor: bool = True
+    is_postprocessor: bool = False
+
+    def forward(
+        self,
+        inputs: Dict[str, torch.Tensor],
+    ) -> Dict[str, torch.Tensor]:
+        # store the total number of atoms
+        # the entry at properties.n_atoms is adapted when slicing molecules
+        # _n_total_atoms will always store the amount of atoms in the full molecule
+        inputs["n_total_atoms"] = inputs[properties.n_atoms]
+        return inputs
+
+
 class GetComposition(Transform):
     """
     Extracts the number of atoms in a molecule that correspond to types from a given
     list of atom types.
+    The result is stored as 'composition' in the inputs dictionary.
     """
 
     is_preprocessor: bool = True
@@ -82,6 +126,7 @@ class GetRelativeAtomicEnergy(Transform):
     data set. We compute :math:`\hat{E}^Z` with linear regression from the atomic
     concentration. The weights and bias are learned using the training data or can
     optionally be supplied.
+    The result is stored as 'relative_atomic_energy' in the inputs dictionary.
     """
 
     is_preprocessor: bool = True
@@ -189,4 +234,54 @@ class GetRelativeAtomicEnergy(Transform):
             energy_per_atom - predicted_energy_per_atom
         )
 
+        return inputs
+
+
+class GetRandomSubstructure(Transform):
+    """
+    Uniformly randomly samples a certain percentage of the atoms in the molecule as
+    pre-defined substructure. Caution, there are no constraints that the atoms have
+    to be connected.
+    """
+
+    is_preprocessor: bool = True
+    is_postprocessor: bool = False
+
+    def __init__(
+        self,
+        percentage: Optional[float] = 0.5,
+    ):
+        """
+        Args:
+            percentage: Number in [0, 1) that determines the percentage of atoms
+                that are part of the randomly sampled substructure.
+        """
+        self.percentage = percentage
+        super().__init__()
+
+    def forward(
+        self,
+        inputs: Dict[str, torch.Tensor],
+    ) -> Dict[str, torch.Tensor]:
+        # number of atoms in the molecule
+        n_atoms_mol = int(inputs[properties.n_atoms])
+        # number of atoms in the substructure
+        n_atoms_substructure = int(self.percentage * n_atoms_mol)
+        # make sure that at least one atom is not part of the substructure
+        if n_atoms_mol == n_atoms_substructure:
+            n_atoms_substructure -= 1
+        # sample substructure
+        if n_atoms_substructure == 0:
+            # set empty list, i.e. no substructure
+            inputs[properties.substructure_idcs] = torch.tensor(
+                [],
+                dtype=torch.long,
+            )
+        else:
+            # randomly draw substructure
+            inputs[properties.substructure_idcs] = torch.multinomial(
+                torch.ones(n_atoms_mol),
+                n_atoms_substructure,
+                replacement=False,
+            )
         return inputs

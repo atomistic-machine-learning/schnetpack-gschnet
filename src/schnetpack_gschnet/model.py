@@ -50,9 +50,9 @@ class ConditionalGenerativeSchNet(AtomisticModel):
         distance_prediction_n_layers: int = 5,
         distance_prediction_n_hidden: List[int] = None,
         distance_prediction_activation: Callable = shifted_softplus,
-        distance_prediction_n_bins: int = 301,
         distance_prediction_min_dist: float = 0.0,
-        distance_prediction_max_dist: float = 15.0,
+        distance_prediction_max_dist: Optional[float] = None,
+        distance_prediction_n_bins: Optional[int] = None,
         postprocessors: Optional[List[Transform]] = None,
         input_dtype_str: str = "float32",
         do_postprocessing: bool = False,
@@ -76,7 +76,7 @@ class ConditionalGenerativeSchNet(AtomisticModel):
             placement_cutoff: determines which atoms are considered to be neighbors
                 when sampling sequences of atom placements (i.e. which atoms can be
                 placed given a focus atom) and thus the range of the grid around the
-                focus atom during generation
+                focus atom during generation.
             conditioning: Module that embeds the conditions, e.g. the composition or a
                 target property value. Set None to train an unconditional model.
             type_prediction_n_layers: Number of layers in the type prediction network.
@@ -96,27 +96,32 @@ class ConditionalGenerativeSchNet(AtomisticModel):
                 of features from the conditioning module).
             distance_prediction_activation: Activation function used in the distance
                 prediction network after all but the last layer.
-            distance_prediction_n_bins: Number of bins (i.e. output neurons) for the
-                distance prediction network.
             distance_prediction_min_dist: Minimum distance covered by the bins of the
                 discretized distance distribution.
             distance_prediction_max_dist: Maximum distance covered by the bins of the
                 discretized distance distribution (all larger distances are mapped to
                 the last bin).
+                If `None`, it is set to `prediction_cutoff` + `placement_cutoff`.
+                This is the furthest possible distance between atoms within the
+                prediction_cutoff and and the next atom.
+            distance_prediction_n_bins: Number of bins (i.e. output neurons) for the
+                distance prediction network.
+                If `None`, it is set to ceil(`distance_prediction_max_dist` * 30) + 1,
+                which leads to bins with a width of 1/30≈0.033 (of the distance unit).
             postprocessors: Post-processing transforms that may be initialized using the
                 `datamodule`, but are not applied during training.
             input_dtype_str: The dtype of real inputs as string.
             do_postprocessing: If true, post-processing is applied.
             average_type_distributions: Determines how the distribution of the type of
                 the next atom is computed from all the distributions predicted by
-                individual atoms. In any case, the individual distributions are first
-                normalized with a softmax.
+                individual atoms.
                 If true, the average of individual distributions is taken as the
                 prediction.
                 If false, the individual distributions are instead multiplied
-                element-wise and then normalized by taking the softmax again, which
-                leads to sharper distributions compared to the averaging, i.e. it
-                further suppresses small probabilities and increases large ones.
+                element-wise and then normalized (by dividing by the sum of all
+                resulting elements), which leads to sharper distributions compared to
+                the averaging, i.e. it further suppresses small probabilities and
+                increases large ones.
             input_modules: Modules that are applied before representation, e.g. to
                 modify input or add additional tensors for response properties.
         """
@@ -156,16 +161,27 @@ class ConditionalGenerativeSchNet(AtomisticModel):
         n_features = representation.n_atom_basis + int(self.n_conditional_features)
         self.register_buffer("n_features", torch.tensor(n_features, dtype=torch.long))
 
+        if distance_prediction_max_dist is None:
+            distance_prediction_max_dist = prediction_cutoff + placement_cutoff
+        if distance_prediction_n_bins is None:
+            distance_prediction_n_bins = (
+                math.ceil(distance_prediction_max_dist * 30) + 1
+            )
+        self.register_buffer("distance_min", torch.tensor(distance_prediction_min_dist))
+        self.register_buffer("distance_max", torch.tensor(distance_prediction_max_dist))
         self.register_buffer(
             "n_distance_bins",
             torch.tensor(distance_prediction_n_bins, dtype=torch.long),
         )
-        self.register_buffer("distance_min", torch.tensor(distance_prediction_min_dist))
-        self.register_buffer("distance_max", torch.tensor(distance_prediction_max_dist))
         self.register_buffer(
             "distance_bin_width",
             (self.distance_max - self.distance_min) / (self.n_distance_bins - 1),
         )
+        self.register_buffer(
+            "average_type_distributions",
+            torch.tensor(average_type_distributions, dtype=torch.bool),
+        )
+        self.register_buffer("distance_unit", torch.tensor([0]))
 
         # initialize type and distance prediction networks
         if type_prediction_n_hidden is None:
@@ -196,8 +212,6 @@ class ConditionalGenerativeSchNet(AtomisticModel):
         self.logsoftmax = nn.LogSoftmax(dim=-1)
 
         self.collect_derivatives()
-        self.average_type_distributions = average_type_distributions
-
         self.input_modules = nn.ModuleList(input_modules)
 
     def forward(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
@@ -313,6 +327,24 @@ class ConditionalGenerativeSchNet(AtomisticModel):
             return {"trajectory": [], "step": [], "atom": []}
         else:
             return self.conditioning_module.condition_names
+
+    def set_distance_unit(self, distance_unit):
+        _distance_unit = torch.tensor(list(map(ord, distance_unit)))
+        if len(self.distance_unit) != 1 or self.distance_unit != torch.tensor([0]):
+            if len(self.distance_unit) != len(_distance_unit) or torch.any(
+                self.distance_unit != _distance_unit
+            ):
+                raise RuntimeError(
+                    f"Trying to set the distance unit of the model to "
+                    f"{distance_unit}. However, the model has already been trained "
+                    f"with distance unit {self.get_distance_unit()}. The distance unit "
+                    f"cannot be changed after training!"
+                )
+        else:
+            self.distance_unit = _distance_unit
+
+    def get_distance_unit(self):
+        return "".join(map(chr, self.distance_unit.tolist()))
 
     def classes_to_types(self, classes: torch.Tensor):
         return self._all_types[classes]
@@ -632,8 +664,8 @@ class CompositionEmbedding(ConditionEmbedding):
             n_features_n_atoms: The number of features in the embedding of the total
                 number of atoms.
             n_layers_n_atoms: The number of layers in the fully connected network that
-            maps from the Gaussian rbf
-                expansion of the number of atoms to the embedding vector.
+                maps from the Gaussian rbf expansion of the number of atoms to the
+                embedding vector.
             condition_min_n_atoms: Minimum value for the Gaussian rbf expansion of the
                 number of atoms.
             condition_max_n_atoms: Maximum value for the Gaussian rbf expansion of the

@@ -301,9 +301,17 @@ class GenerativeAtomsDataModule(AtomsDataModule):
     def load_partitions(self):
         # TODO: handle IterDatasets
         # handle relative dataset sizes
-        if self.num_train is not None and self.num_train <= 1.0:
+        if (
+            self.num_train is not None
+            and isinstance(self.num_train, float)
+            and self.num_train <= 1.0
+        ):
             self.num_train = round(self.num_train * len(self.dataset))
-        if self.num_val is not None and self.num_val <= 1.0:
+        if (
+            self.num_val is not None
+            and isinstance(self.num_val, float)
+            and self.num_val <= 1.0
+        ):
             self.num_val = min(
                 round(self.num_val * len(self.dataset)),
                 len(self.dataset) - self.num_train,

@@ -1,6 +1,8 @@
 # @package _global_
 
 defaults:
+  - override /run: gschnet_run
+  - override /globals: gschnet_globals
   - override /data: gschnet_qm9
   - override /task: gschnet_task
   - override /callbacks:
@@ -11,6 +13,7 @@ defaults:
       - modelsummary
   - override /model: gschnet
   - override /model/conditioning: gap_relenergy
+  - _self_
 
 run:
   path: ${run.work_dir}/models/qm9_${globals.name}
@@ -18,7 +21,7 @@ run:
 
 globals:
   model_cutoff: 10.
-  prediction_cutoff: 10.
+  prediction_cutoff: 5.
   placement_cutoff: 1.7
   use_covalent_radii: True
   covalent_radius_factor: 1.1

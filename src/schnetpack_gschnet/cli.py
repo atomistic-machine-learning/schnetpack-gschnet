@@ -4,6 +4,7 @@ import tempfile
 import shutil
 import socket
 
+import ase.visualize
 import torch
 import hydra
 import numpy as np
@@ -17,9 +18,12 @@ from ase import Atoms
 from tqdm import tqdm
 
 from schnetpack.utils.script import print_config
+from schnetpack_gschnet import properties
+from schnetpack_gschnet.data import GenerativeAtomsDataModule
 from schnetpack_gschnet.generate_molecules import (
     generate_molecules,
     generate_molecules_debug,
+    generate_molecules_from_substructure,
 )
 
 log = logging.getLogger(__name__)
@@ -50,9 +54,23 @@ def generate(config: DictConfig):
         print_config(
             config,
             resolve=False,
-            fields=("modeldir", "generate")
+            fields=(
+                "modeldir",
+                "n_molecules",
+                "batch_size",
+                "max_n_atoms",
+                "conditions",
+            )
             if config.workdir is None
-            else ("modeldir", "workdir", "remove_workdir", "generate"),
+            else (
+                "modeldir",
+                "workdir",
+                "remove_workdir",
+                "n_molecules",
+                "batch_size",
+                "max_n_atoms",
+                "conditions",
+            ),
         )
 
     with connect(outputfile) as con:
@@ -79,10 +97,33 @@ def generate(config: DictConfig):
     # load model
     model = torch.load("best_model", map_location=device)
 
+    # set up the metadata of the db (including the distance unit used in the model)
+    with connect(outputfile) as con:
+        try:
+            distance_unit = model.get_distance_unit()
+        except:
+            distance_unit = "unknown"
+        if n_existing_mols == 0:
+            md = {
+                "_property_unit_dict": {},
+                "_distance_unit": distance_unit,
+            }
+            con.metadata = md
+        else:
+            # if the db contains molecules verify the distance unit is consistent
+            if distance_unit != con.metadata["distance_unit"]:
+                raise ValueError(
+                    f"The data base already contains molecules generated from a "
+                    f"model using the distance unit "
+                    f"`{con.metadata['distance_unit']}`. Your current model is "
+                    f"using the distance unit `{distance_unit}`. "
+                    f"Please specify a different output file."
+                )
+
     # parse composition (if it is included in conditions)
-    if "conditions" not in config.generate:
+    if "conditions" not in config:
         with open_dict(config):
-            config.generate.conditions = {}
+            config.conditions = {}
     original_conditions = OmegaConf.to_container(
         config.settings.conditions.trajectory, resolve=True
     )
@@ -91,48 +132,100 @@ def generate(config: DictConfig):
     )
 
     # compute number of required batches
-    n_batches = int(np.ceil(config.generate.n_molecules / config.generate.batch_size))
+    n_batches = int(np.ceil(config.n_molecules / config.batch_size))
     if config.debug.run:
-        n_batches = config.generate.n_molecules
+        n_batches = config.n_molecules
         log.info(
             f"Caution: Using debug version of the generation function. The batch size "
             f"is automatically set to 1."
         )
 
+    # extract substructures to start from (if any)
+    if config.start_from_substructure:
+        if config.debug.run:
+            raise ValueError(
+                f"Generation from substructures cannot be run in debug "
+                f"mode! Please set only one of 'debug.run' and "
+                f"'generate.start_from_substructure'."
+            )
+        else:
+            substructures = load_substructures(config.substructure)
+            orig_n_batchs = n_batches
+            if len(substructures) > 1:
+                log.info(
+                    f"Generating {config.n_molecules} molecules for each of "
+                    f"the {len(substructures)} selected substructures."
+                )
+                n_batches *= len(substructures)
+                config.n_molecules *= len(substructures)
+
+    # check if conditions were provided that the model is not trained on
+    condition_names = model.get_condition_names()
+    for condition_type in config.settings.conditions:
+        for condition_name in config.settings.conditions[condition_type]:
+            if (
+                condition_names[condition_type] is None
+                or condition_name not in condition_names[condition_type]
+            ):
+                log.warn(
+                    f"The condition `{condition_name}` was provided but the "
+                    f"model has not been trained with this condition. The provided "
+                    f"value will be ignored during generation!"
+                )
+
     # generate molecules in batches
     log.info(
-        f"Generating {config.generate.n_molecules} molecules in {n_batches} batches! "
+        f"Generating {config.n_molecules} molecules in {n_batches} batches! "
         f'Running on device "{device}".'
     )
     ats = []
     with connect(outputfile) as con:
         for i in tqdm(range(n_batches)):
             # generate
-            remaining = config.generate.n_molecules - i * config.generate.batch_size
+            remaining = config.n_molecules - i * config.batch_size
             with torch.no_grad():
-                if not config.debug.run:
-                    R, Z, finished_list = generate_molecules(
+                if config.debug.run:
+                    R, Z, finished_list, n_tokens = generate_molecules_debug(
                         model=model,
-                        n_molecules=min(config.generate.batch_size, remaining),
-                        max_n_atoms=config.generate.max_n_atoms,
-                        grid_distance_min=config.generate.grid_distance_min,
-                        grid_spacing=config.generate.grid_spacing,
+                        max_n_atoms=config.max_n_atoms,
+                        grid_distance_min=config.grid_distance_min,
+                        grid_spacing=config.grid_spacing,
                         conditions=config.settings.conditions,
                         device=device,
-                        t=config.generate.temperature_term,
-                        grid_batch_size=config.generate.grid_batch_size,
-                    )
-                else:
-                    R, Z, finished_list = generate_molecules_debug(
-                        model=model,
-                        max_n_atoms=config.generate.max_n_atoms,
-                        grid_distance_min=config.generate.grid_distance_min,
-                        grid_spacing=config.generate.grid_spacing,
-                        conditions=config.settings.conditions,
-                        device=device,
-                        t=config.generate.temperature_term,
+                        t=config.temperature_term,
                         print_progress=config.debug.print_progress,
                         view_progress=config.debug.view_progress,
+                    )
+                elif config.start_from_substructure:
+                    substructure = substructures[int(i / orig_n_batchs)]
+                    (
+                        R,
+                        Z,
+                        finished_list,
+                        n_tokens,
+                    ) = generate_molecules_from_substructure(
+                        model=model,
+                        substructure=substructure,
+                        n_molecules=min(config.batch_size, remaining),
+                        max_n_atoms=config.max_n_atoms,
+                        grid_distance_min=config.grid_distance_min,
+                        grid_spacing=config.grid_spacing,
+                        conditions=config.settings.conditions,
+                        device=device,
+                        t=config.temperature_term,
+                        grid_batch_size=config.grid_batch_size,
+                    )
+                else:
+                    R, Z, finished_list, n_tokens = generate_molecules(
+                        model=model,
+                        n_molecules=min(config.batch_size, remaining),
+                        max_n_atoms=config.max_n_atoms,
+                        grid_distance_min=config.grid_distance_min,
+                        grid_spacing=config.grid_spacing,
+                        conditions=config.settings.conditions,
+                        device=device,
+                        t=config.temperature_term,
+                        grid_batch_size=config.grid_batch_size,
                     )
 
                 # store generated molecules in db
@@ -140,8 +233,8 @@ def generate(config: DictConfig):
                 Z = Z.cpu().numpy()
                 for idx, n_atoms in finished_list:
                     at = Atoms(
-                        numbers=Z[idx, 2 : n_atoms + 2],
-                        positions=R[idx, 2 : n_atoms + 2],
+                        numbers=Z[idx, n_tokens : n_atoms + n_tokens],
+                        positions=R[idx, n_tokens : n_atoms + n_tokens],
                     )
                     ats += [at]
                     con.write(at)
@@ -158,6 +251,9 @@ def generate(config: DictConfig):
                     .cpu()
                     .numpy()
                     .tolist(),
+                    "max_n_atoms": config.max_n_atoms,
+                    "grid_distance_min": config.grid_distance_min,
+                    "grid_spacing": config.grid_spacing,
                 }
             }
         )
@@ -246,3 +342,50 @@ def parse_composition(conditions, available_atom_types):
                 H_str += f"{atom_name}{composition_dict[atom_name]}"
     conditions.trajectory.composition = ListConfig(composition_list)
     return conditions
+
+
+def load_substructures(substructure_cfg):
+    if OmegaConf.select(substructure_cfg, "idcs") is None:
+        return [{}]
+    substructures = []
+    # check if datapath was provided
+    if OmegaConf.select(substructure_cfg, "data.datapath") is None:
+        raise ValueError(
+            "Config value 'generate.substructure.data.datapath' is "
+            "missing! Please specify datapath to load substructures "
+            "from test set molecules!"
+        )
+    # load and resolve training config
+    train_config = OmegaConf.load(Path("./config.yaml"))
+    OmegaConf.resolve(train_config)
+    # load missing values in generate data config from train data config
+    for key in OmegaConf.missing_keys(substructure_cfg):
+        _key = key.split(".")[-1]
+        if _key in train_config.data:
+            substructure_cfg.data[_key] = train_config.data[_key]
+        else:
+            raise ValueError(
+                f"The config value {key} is missing and could not be "
+                f"inferred from the training data config. Please "
+                f"specify it to load substructures from test set "
+                f"molecules!"
+            )
+    # instantiate data loader
+    data: GenerativeAtomsDataModule = hydra.utils.instantiate(substructure_cfg.data)
+    data.prepare_data()
+    data.setup()
+    # make sure that idcs is a list
+    if isinstance(substructure_cfg.idcs, int):
+        substructure_cfg.idcs = [substructure_cfg.idcs]
+    if substructure_cfg.idcs == "all":
+        substructure_cfg.idcs = ListConfig(list(range(len(data.test_dataset))))
+    # load all substructures in the list
+    for idx in substructure_cfg.idcs:
+        mol = data.test_dataset[idx]
+        substructures += [
+            {
+                properties.R: mol[properties.R][mol[properties.substructure_idcs]],
+                properties.Z: mol[properties.Z][mol[properties.substructure_idcs]],
+            }
+        ]
+    return substructures

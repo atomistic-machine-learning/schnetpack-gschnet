@@ -95,6 +95,9 @@ class ConditionalGenerativeSchNetTask(AtomisticTask):
                         self.model.placement_cutoff,
                     )
         if stage == "fit":
+            # store the used distance unit in the model for reference
+            self.model.set_distance_unit(dm.dataset.distance_unit)
+            # initialize the transforms
             self.model.initialize_transforms(dm)
 
     def load_state_dict(self, state_dict: Dict[str, Any], **kwargs) -> None:
@@ -111,6 +114,16 @@ class ConditionalGenerativeSchNetTask(AtomisticTask):
                     f"the config ({val2:.2f}!={val1:.2f}). You cannot change the "
                     f"{name}. Please set it to {val2:.2f} or train a new model."
                 )
+        # make sure that the distance unit has not been changed
+        distance_unit = "".join(list(map(chr, state_dict["model.distance_unit"])))
+        if self.model.get_distance_unit() != distance_unit:
+            raise ValueError(
+                f"The distance unit in the checkpoint is different from the one in "
+                f"the config (`{distance_unit}` != "
+                f"`{self.model.get_distance_unit()}`). You cannot change the "
+                f"distance unit. Please set it to `{distance_unit}` or train a new "
+                f"model."
+            )
         # load checkpoint
         super().load_state_dict(state_dict, **kwargs)
 

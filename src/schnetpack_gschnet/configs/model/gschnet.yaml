@@ -1,11 +1,13 @@
 defaults:
   - conditioning: ???
+  - _self_
 
 _target_: schnetpack_gschnet.ConditionalGenerativeSchNet
+
 representation:
   _target_: schnetpack_gschnet.SchNet
-  n_atom_basis: 128
-  n_interactions: 9
+  n_atom_basis: 128     # number of features in the extracted atom-wise representation
+  n_interactions: 9     # number of interaction blocks used in SchNet for feature extraction
   radial_basis:
     _target_: schnetpack.nn.radial.GaussianRBF
     n_rbf: 25
@@ -14,6 +16,15 @@ representation:
     _target_: schnetpack.nn.cutoff.CosineCutoff
     cutoff: ${globals.model_cutoff}
   max_z: 130
+
+type_prediction_n_layers: 5           # number of layers in the type prediction network
+type_prediction_n_hidden: 256         # number of neurons in the hidden layers of the type prediction network
+distance_prediction_n_layers: 5       # number of layers in the distance prediction network
+distance_prediction_n_hidden: 256     # number of neurons in the hidden layers of the distance prediction network
+
+distance_prediction_max_dist: null    # maximum distance covered in distance distributions (default: prediction_cutoff+placement_cutoff)
+distance_prediction_n_bins: null      # number of bins in distance distributions (default: ceil(30*distance_prediction_max_dist)+1)
+
 atom_types: ${globals.atom_types}
 origin_type: ${globals.origin_type}
 focus_type: ${globals.focus_type}
@@ -21,5 +32,3 @@ stop_type: ${globals.stop_type}
 model_cutoff: ${globals.model_cutoff}
 prediction_cutoff: ${globals.prediction_cutoff}
 placement_cutoff: ${globals.placement_cutoff}
-type_prediction_n_hidden: [206, 156, 106, 56]
-distance_prediction_n_hidden: [264, 273, 282, 291]

@@ -1,11 +1,16 @@
-defaults:
-  - conditions: null
-  - _self_
+# @package _global_
 
-n_molecules: 100
-batch_size: 10
-max_n_atoms: 35
-grid_distance_min: 0.7
-grid_spacing: 0.05
-temperature_term: 0.1
-grid_batch_size: 0
+modeldir: ???           # path to trained model that is used for generation
+n_molecules: ???        # number of molecules that shall be generated
+batch_size: ???         # batch size during molecule generation
+max_n_atoms: ???        # maximum number of atoms allowed in generated molecules
+
+conditions: null        # target conditions (null->unconditional generation)
+
+use_gpu: True           # whether to use GPU for generation (False->use CPU)
+outputfile: null        # path to output db (null->modeldir/generated_molecules/<num>.db)
+view_molecules: False   # show molecules with ASE GUI after generation
+
+grid_distance_min: 0.7  # minimum distance of 3d grid to focused atom
+grid_spacing: 0.05      # width of bins in the 3d grid into x,y,z-directions
+temperature_term: 0.1   # smoothing of the 3d distribution (small->peakier distribution)

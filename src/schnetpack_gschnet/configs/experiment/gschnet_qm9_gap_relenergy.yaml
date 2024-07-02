@@ -21,7 +21,7 @@ run:
 
 globals:
   model_cutoff: 10.
-  prediction_cutoff: 10.
+  prediction_cutoff: 5.
   placement_cutoff: 1.7
   use_covalent_radii: True
   covalent_radius_factor: 1.1

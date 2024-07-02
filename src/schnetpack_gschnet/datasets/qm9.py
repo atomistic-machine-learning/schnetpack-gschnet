@@ -285,9 +285,9 @@ class QM9Gen(GenerativeAtomsDataModule):
 
         property_list = []
 
-        irange = np.arange(len(ordered_files), dtype=np.int)
+        irange = np.arange(len(ordered_files), dtype=int)
         if uncharacterized is not None:
-            irange = np.setdiff1d(irange, np.array(uncharacterized, dtype=np.int) - 1)
+            irange = np.setdiff1d(irange, np.array(uncharacterized, dtype=int) - 1)
 
         for i in tqdm(irange):
             xyzfile = os.path.join(raw_path, ordered_files[i])

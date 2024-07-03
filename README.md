@@ -10,6 +10,7 @@ Here we provide a re-implementation of [cG-SchNet](https://github.com/atomistic-
 Compared to previous releases, SchNetPack changed from batching molecules to batching atoms, effectively removing the need for padding the neural network inputs.
 G-SchNet greatly benefits from this change in terms of memory requirements, allowing to train models of the same expressivity on GPUs with less VRAM.
 
+The package contains a standardized routine for the [filtering of generated molecules](/README.md#filtering-molecules) for validity, uniqueness, and novelty.
 Furthermore, we [altered a few implementation details](/README.md#changes-in-this-implementation) to improve scalability and simplify adaptations to custom data sets. 
 Therefore, we recommend this version for applications of G-SchNet to new data sets and further development of the method.
 For reproduction of the results reported in our publications, please refer to the specific repositories:
@@ -26,6 +27,7 @@ For reproduction of the results reported in our publications, please refer to th
     + [Using custom data](/README.md#using-custom-data)
     + [Scaling up the training](/README.md#scaling-up-the-training)
   + [Molecule generation](/README.md#molecule-generation)
+    + [Filtering molecules](/README.md#filtering-molecules)
 + [Additional information](/README.md#additional-information)
   + [FAQ and troubleshooting](/README.md#faq-and-troubleshooting)
   + [Changes in this implementation](/README.md#changes-in-this-implementation)
@@ -356,6 +358,44 @@ All settings can directly be set in the CLI, e.g. add `view_molecules=True` to d
 | `grid_distance_min` | `0.7` | The minimum distance between a new atom and the focus atom. Determines the extent of the 3d grid together with the `placement_cutoff` used during model training, which sets the maximum distance between new atom and focus. |
 | `grid_spacing` | `0.05` | The size of a bin in the 3d grid (i.e. a value of 0.05 means each bin has a size of 0.05x0.05x0.05). |
 | `temperature_term` | `0.1` | The temperature term in the normalization of the 3d grid probability. A smaller value leads to more pronounced peaks whereas a larger value increases randomness by smoothing the distribution. |
+
+
+### Filtering molecules
+
+After generation, a common postprocessing step is to filter the molecules for validity, uniqueness, and novelty.
+There exist many ways to do so and thus statistics reported in publications are often not directly comparable.
+In `schnetpack-gschnet`, we provide a standardize script that filters a data base of molecules using the implementation of [xyz2mol](https://github.com/jensengroup/xyz2mol) available in [RDKit](https://www.rdkit.org/docs/source/rdkit.Chem.rdDetermineBonds.html).
+The translation of the structures, and therefore the result of the analysis, depends on the exact version of `RDKit` and the options used when calling the script.
+Therefore, if you employ the script for analysis in a publication, please report the installed version of `RDKit`, the version of `schnetpack-gschnet`, and the exact options used in the call.
+This facilitates the reproduction of the results and enables fair comparisons.
+
+The script translates the generated 3d structures into molecular graphs in the form of canonical, isomeric SMILES strings.
+Then, based on the string, it checks the valency of all atoms given permissible charges of the system.
+It also uses the strings to check the uniqueness of molecules and to compare them to structures in the training data set.
+The script is called `check_validity.py` and a typical call is:
+
+```
+python <path/to/schnetpack-gschnet>/src/scripts/check_validity.py <path-to-db> --compute_uniqueness --compare_db_path <path-to-training-db> --compare_db_split_path <modeldir>/split.npz --ignore_enantiomers --timeout 2 --results_db_path auto --results_db_flags unique
+```
+
+Here, we provide the paths to the training data base and the split file to be able to identify which generated molecules match training, validation, and test structures.
+The routine will store a new data base file containing only valid and uniqe molecules into the same directory as the input data base, using the same name but appending `_filtered`.
+The usage of `--ignore_enantiomers` is optional and it determines that mirror-image stereoisomers are treated as identical molecules.
+The timeout of 2 seconds interrupts the translation from 3d structure to molecular graph if it takes too long, which can happen for large molecules.
+The number of molecules that could not be translated due to the timeout is printed by the script.
+Please note that the process is not always immediately interrupted and can therefore take longer than the specified timeout per structure.
+By default, molecules are only allowed to have a total charge of zero and cannot contain charged fragments.
+Since charged fragments or other total charges might be permissible depending on the training data set, these settings can be adjusted with, e.g., `--allow_charged_fragments --allowed_charges 0 -1` to allow charged fragments and total charges of zero and minus one.
+To display all available options, call the script with `--help`.
+Depending on the required analysis, the call can of course be simplified by removing options.
+For example, to only identify and remove invalid structures, use:
+
+```
+python <path/to/schnetpack-gschnet>/src/scripts/check_validity.py <path-to-db> --timeout 2 --results_db_path auto
+```
+
+This call can also be used with training data bases, e.g. to filter the reference structures for validity prior to training.
+
 
 # Additional information
 

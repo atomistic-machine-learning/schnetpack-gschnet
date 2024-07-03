@@ -234,13 +234,17 @@ class GenerativeAtomsDataModule(AtomsDataModule):
                     ),
                 ]
                 _batch_size = 100
+
+                def _identity(x):
+                    return x
+
                 preprocessing_loader = AtomsLoader(
                     dataset,
                     batch_size=_batch_size,
                     num_workers=self.num_preprocessing_workers,
                     shuffle=False,
                     pin_memory=False,
-                    collate_fn=lambda x: x,
+                    collate_fn=_identity,
                 )
                 subset = np.empty(len(dataset), dtype=bool)
                 _iteration = 0

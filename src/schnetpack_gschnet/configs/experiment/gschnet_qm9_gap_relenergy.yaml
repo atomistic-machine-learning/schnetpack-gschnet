@@ -41,8 +41,6 @@ callbacks:
     patience: 25
   progress_bar:
     refresh_rate: 100
-  model_summary:
-    max_depth: -1
 
 data:
   batch_size: 5

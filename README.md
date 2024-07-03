@@ -394,7 +394,7 @@ For example, to only identify and remove invalid structures, use:
 python <path/to/schnetpack-gschnet>/src/scripts/check_validity.py <path-to-db> --timeout 2 --results_db_path auto
 ```
 
-This call can also be used with training data bases, e.g. to filter the reference structures for validity prior to training.
+This call can also be used with training data bases, e.g. to compute the percentage of training structures that can be validated with the method for reference or to filter the structures prior to training.
 
 
 # Additional information

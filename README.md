@@ -39,7 +39,7 @@ For example, the following commands will clone the repository into your current 
 
 ```
 git clone https://github.com/atomistic-machine-learning/schnetpack-gschnet.git
-conda create -n gschnet numpy
+conda create -n gschnet
 conda activate gschnet
 pip install ./schnetpack-gschnet
 ```
@@ -71,7 +71,7 @@ For more details on the strucure of the config, the CLI, and the PyTorch Lightni
 If you have copied the configs directory as recommended [above](/README.md#configuration-and-cli), the following call will start a training run in the current working directory:
 
 ```
-python <path/to/schnetpack-gschnet>/src/scripts/train.py --config-dir=<path/to/my_gschnet_configs> experiment=gschnet_qm9
+gschnet_train --config-dir=<path/to/my_gschnet_configs> experiment=gschnet_qm9
 ```
 
 The call to the training script requires two arguments, the directory with configs from `schnetpack-gschnet` and the name of the experiment config you want to run.
@@ -110,7 +110,7 @@ All these settings can easily be changed in the CLI, e.g. using `trainer.acceler
 | `globals.focus_type` | `122` | Type used for the auxiliary focus token (cannot be contained in `globals.atom_types`). At each step, the focus is aligned with a randomly selected atom and the atom placed next needs to be a neighbor of that focused atom. |
 | `globals.stop_type` | `123` | Type used for the stop marker that G-SchNet predicts to mark that it cannot place more atoms in the neighborhood of the current focus (cannot be contained in `globals.atom_types`). |
 | `globals.model_cutoff` | `10.` | The cutoff used in the interaction blocks of the SchNet model which extracts features from the intermediate molecular structures. |
-| `globals.prediction_cutoff` | `10.` | The cutoff used to determine for which atoms around the focus the distance to the new atom is predicted. |
+| `globals.prediction_cutoff` | `5.` | The cutoff used to determine for which atoms around the focus the distance to the new atom is predicted. |
 | `globals.placement_cutoff` | `1.7` | The cutoff used to determine which atoms can be placed (i.e. which are neighbors of the focus) when building a trajectory of atom placements for training. |
 | `globals.use_covalent_radii` | `True` | If True, the covalent radii of atom types are additionally used to check whether atoms that are inside the `globals.placement_cutoff` are neighbors of the focus. We use the covalent radii provided in the `ase` package and check whether the distance between the focus and another atom is smaller than the sum of the covalent radii for the types of the two atoms scaled by `globals.covalent_radii_factor`. |
 | `globals.covalent_radius_factor` | `1.1` | Scales the sum of the two covalent radius numbers to relax the neighborhood criterion when `globas.use_covalent_radii` is True. |
@@ -145,7 +145,7 @@ The base class for the embedding networks is [ConditionEmbedding](https://github
 To specify a set of target properties for an experiment, we set up the corresponding `ConditioningModule` in a config file.
 For example, the experiment `gschnet_qm9_gap_relenergy`, which targets HOMO-LUMO gap and relative atomic energy as conditions, uses the following config:
 
-https://github.com/atomistic-machine-learning/schnetpack-gschnet/blob/724ddc6c1ed965e0900e74f197225fe7bbcadd51/src/schnetpack_gschnet/configs/model/conditioning/gap_relenergy.yaml#L1-L22
+https://github.com/atomistic-machine-learning/schnetpack-gschnet/blob/dd80e3c6ad04791b1f4dc3820926d4db460522b1/src/schnetpack_gschnet/configs/model/conditioning/gap_relenergy.yaml#L1-L22
 
 Both, the energy and the gap, are embedded using a `ScalarConditionEmbedding`.
 It projects a scalar value into vector space using a Gaussian expansion with centers between `condition_min` and `condition_max` and a spacing of `grid_spacing`, i.e. 5 centers in the examples above.
@@ -161,9 +161,9 @@ Instead, we load the total energy at zero Kelvin `energy_U0` and compute the rel
 To this end, there exist `transforms` that are applied to every data point by the data loader.
 The `transforms` are specified in the experiment config as part of the `data` field:
 
-https://github.com/atomistic-machine-learning/schnetpack-gschnet/blob/724ddc6c1ed965e0900e74f197225fe7bbcadd51/src/schnetpack_gschnet/configs/experiment/gschnet_qm9_gap_relenergy.yaml#L44-L69
+https://github.com/atomistic-machine-learning/schnetpack-gschnet/blob/dd80e3c6ad04791b1f4dc3820926d4db460522b1/src/schnetpack_gschnet/configs/experiment/gschnet_qm9_gap_relenergy.yaml#L45-L70
 
-The corresponding `GetRelativeAtomicEnergy` transform is defined in lines 51-54.
+The corresponding `GetRelativeAtomicEnergy` transform is defined in lines 52-55.
 On a side note, we see that transforms take care of all kind of preprocessing tasks, e.g. centering the atom positions, computing neighborhood lists of atoms, and sampling a trajectory of atom placements for the molecule.
 
 As another example, you can refer to the experiment `gschnet_qm9_comp_relenergy`, which targets the atomic composition and the relative atomic energy as conditions.
@@ -177,15 +177,20 @@ To this end, we can delete lines 14-22 in the `gap_relenergy` conditioning confi
 Then, the training can be started with:
 
 ```
-python <path/to/schnetpack-gschnet>/src/scripts/train.py --config-dir=<path/to/my_gschnet_configs> experiment=gschnet_qm9 model/conditioning=gap
+gschnet_train --config-dir=<path/to/my_gschnet_configs> experiment=gschnet_qm9 model/conditioning=gap
 ```
 
 If the target properties are not stored in the data base, it is most convenient to set up an experiment config with suitable `transforms` that compute them.
-We directly link the conditioning config in the experiment config by overriding `/model/conditioning` in the defaults list, as can be seen in the last line of the following example:
+We directly link the conditioning config in the experiment config by overriding `/model/conditioning` in the defaults list, as can be seen in the second last line of the following example:
 
-https://github.com/atomistic-machine-learning/schnetpack-gschnet/blob/724ddc6c1ed965e0900e74f197225fe7bbcadd51/src/schnetpack_gschnet/configs/experiment/gschnet_qm9_gap_relenergy.yaml#L3-L13
+https://github.com/atomistic-machine-learning/schnetpack-gschnet/blob/dd80e3c6ad04791b1f4dc3820926d4db460522b1/src/schnetpack_gschnet/configs/experiment/gschnet_qm9_gap_relenergy.yaml#L3-L16
 
-Then, we only provide the name of the new experemint config in the CLI and do not need an additional argument for the conditioning config.
+Then, we only provide the name of the new experiment config in the CLI and do not need an additional argument for the conditioning config.
+For instance, with the experiment config for a model conditioned on HOMO-LUMO gap and relative atomic energy, the call is:
+
+```
+gschnet_train --config-dir=<path/to/my_gschnet_configs> experiment=gschnet_qm9_gap_relenergy
+```
 
 ### Using custom data
 
@@ -233,17 +238,17 @@ To find which units are supported, please check the [ASE units module](https://w
 It includes most common units such as `eV`, `Ha`, `Bohr`, `kJ`, `kcal`, `mol`, `Debye`, `Ang`, `nm` etc.
 
 Once the data is in the required format, we can train G-SchNet.
-To this end, we provide the `gschnet_template` experiment config and the `template` data config:
+To this end, we provide the `gschnet_template` experiment config and the `custom_data` data config:
 
-https://github.com/atomistic-machine-learning/schnetpack-gschnet/blob/d6e2fd13a46cb04d1617d347f8802fc0f385835a/src/schnetpack_gschnet/configs/experiment/gschnet_template.yaml#L1-L62
-https://github.com/atomistic-machine-learning/schnetpack-gschnet/blob/d6e2fd13a46cb04d1617d347f8802fc0f385835a/src/schnetpack_gschnet/configs/data/template.yaml#L1-L14
+https://github.com/atomistic-machine-learning/schnetpack-gschnet/blob/dd80e3c6ad04791b1f4dc3820926d4db460522b1/src/schnetpack_gschnet/configs/experiment/gschnet_template.yaml#L1-L31
+https://github.com/atomistic-machine-learning/schnetpack-gschnet/blob/dd80e3c6ad04791b1f4dc3820926d4db460522b1/src/schnetpack_gschnet/configs/data/custom_data.yaml#L1-L28
 
 Here, arguments specific to the custom data set are left with `???`, wich means that they need to be specified in the CLI when using the configs.
 For example, assume we have stored a data base with 10k molecules consisting of carbon, oxygen, and hyrogen at _/home/user/custom_dataset.db_.
-Then, we can start the training process with the following, long call:
+Then, we can start the training process with the following call:
 
 ```
-python <path/to/schnetpack-gschnet>/src/scripts/train.py --config-dir=<path/to/my_gschnet_configs> experiment=gschnet_template data.datapath=/home/user/custom_dataset.db data.batch_size=10 data.num_train=5000 data.num_val=2000 globals.name=custom_data globals.id=first_try globals.model_cutoff=10 globals.prediction_cutoff=10 globals.placement_cutoff=1.7 globals.atom_types="[1, 6, 8]"
+gschnet_train --config-dir=<path/to/my_gschnet_configs> experiment=gschnet_template data.datapath=/home/user/custom_dataset.db data.batch_size=10 data.num_train=5000 data.num_val=2000 globals.name=custom_data globals.id=first_run globals.model_cutoff=10 globals.prediction_cutoff=5 globals.placement_cutoff=1.7 globals.atom_types="[1, 6, 8]"
 ```
 
 Alternatively, you can copy the configs and fill in the left-out arguments in the files.
@@ -282,9 +287,9 @@ Choosing a larg prediction cutoff will lead to higher flexibility of the network
 A very small prediction cutoff might hurt the performance of the model.
 The model cutoff determines the neighbors that exchange messages when extracting atom-wise features from the molecular structure.
 A large model cutoff can be interpreted as increasing the receptive field of an atom but comes with higher computational costs.
-From our experience, we recommend to set both cutoffs to similar values.
+From our experience, we recommend to set values between 5 and 10 Angstrom, with the model cutoff larger or equal to the prediction cutoff.
 The corresponding config settings are `globals.prediction_cutoff` and `globals.model_cutoff`.
-For QM9, we use 10 Angstrom, which should also be a reasonable starting point for other data sets.
+For QM9, we use 10 Angstrom for the model cutoff and 5 Angstrom for the prediction cutoff, which should also be a reasonable starting point for other data sets.
 
 #### 3. Use caching of neighborlists
 
@@ -294,25 +299,15 @@ If the GPU has a low utilization during training, it might help to use more work
 The number of workers for training, validation, and test data can be set with `data.num_workers`, `data.num_val_workers`, and `data.num_test_workers`, respectively.
 However, for larger molecules we generally recommend to cache the computed neighborlists to reduce the load of the workers.
 To this end, the package contains the `GeneralCachedNeighborList` [transform](https://github.com/atomistic-machine-learning/schnetpack-gschnet/blob/724ddc6c1ed965e0900e74f197225fe7bbcadd51/src/schnetpack_gschnet/transform/neighborlist.py#L33).
-It can be incorporated in the experiment config by wrapping `ConditionalGSchNetNeighborList` in the list of transforms as follows:
+It can be incorporated in the experiment config by wrapping `ConditionalGSchNetNeighborList` in the list of transforms.
+For custom data, we have a config file called `custom_data_cached` with the corresponding setup of transforms:
 
-```yaml
-    - _target_: schnetpack_gschnet.transform.GeneralCachedNeighborList
-      cache_path: ${run.work_dir}/cache
-      keep_cache: False
-      cache_workdir: ${globals.cache_workdir}
-      neighbor_list:
-        _target_: schnetpack_gschnet.transform.ConditionalGSchNetNeighborList
-        model_cutoff: ${globals.model_cutoff}
-        prediction_cutoff: ${globals.prediction_cutoff}
-        placement_cutoff: ${globals.placement_cutoff}
-        environment_provider: ase
-        use_covalent_radii: ${globals.use_covalent_radii}
-        covalent_radius_factor: ${globals.covalent_radius_factor}
-```
+https://github.com/atomistic-machine-learning/schnetpack-gschnet/blob/dd80e3c6ad04791b1f4dc3820926d4db460522b1/src/schnetpack_gschnet/configs/data/custom_data_cached.yaml#L17-L27
 
+To use this data config, add `data=custom_data_cached` to the training call.
 The cache will be stored at `cache_path` and deleted after training unless `keep_cache` is set to `True`.
 As the neighborlist results depend on the chosen cutoffs, do not re-use the cache from previous runs unless you are 100% sure that all settings are identical.
+
 
 #### 4. Use working directories for data and caching
 
@@ -324,46 +319,43 @@ They are automatically deleted if the run finishes without errors.
 
 ## Molecule generation
 
-After training a model, you can generate molecules from the CLI with the generation script:
+After training a model, you can generate molecules from the CLI with the generation script.
+Four parameters are required.
+These are root directory of the trained model (i.e. the directory containing the files _best\_model_, _cli.log_, _config.yaml_ etc.), the number of molecules that shall be generated, the size of batches for generation, and a maximum number of atoms that the model is allowed to sample per molecule:
 
 ```
-python <path/to/schnetpack-gschnet>/src/scripts/generate.py --config-dir=<path/to/my_gschnet_configs> modeldir=<path/to/trained/model>
+gschnet_generate modeldir=<path/to/trained/model> n_molecules=1000 batch_size=500 max_n_atoms=120
 ```
 
-The call to the generation script requires two arguments, the directory with configs from `schnetpack-gschnet` and the path to the root directory of the trained model, i.e. the directory containing the files _best\_model_, _cli.log_, _config.yaml_ etc.
 The generated molecules are stored in an `ASE` data base at `<modeldir>/generated_molecules/`.
 For models trained with conditions, target values for all properties that were used have to be specified.
 For example, for a model trained with the `gschnet_qm9_gap_relenergy` config, both a target HOMO-LUMO gap and relative atomic energy have to be set.
 This can be done by appending the following arguments to the CLI call:
 
 ```
-+generate.conditions.gap=4.0 +generate.conditions.relative_atomic_energy=-0.2
+++conditions.gap=4.0 ++conditions.relative_atomic_energy=-0.2
 ```
 
-Here the `+` is needed to append new arguments to the config (as opposed to setting new values for existing config entries).
-Alternatively, you can create a config file for the target property values at `<path/to/my_gschnet_configs>/generate/conditions/my_conditions.yaml` and append it to the config by adding `generate/conditions=my_conditions` to the CLI call.
-The package contains two [exemplary target value config files](/src/schnetpack_gschnet/configs/generate/conditions) that cover the two cG-SchNet example experiments using the target values from the corresponding experiments in the publication.
+Here the `++` is needed to append new arguments to the config (as opposed to setting new values for existing config entries).
 Note that the names of the target properties have to correspond to the `condition_name` specified in the conditioning configs of the trained model.
 That is why we use _gap_ and _relative\_atomic\_energy_ here, as specified in lines 6 and 15 of the [conditioning config](/src/schnetpack_gschnet/configs/model/conditioning/gap_relenergy.yaml).
 In models conditioned on the atomic composition, the corresponding property name is automatically set to _composition_.
 
-In the following table, we list all settings for the generation script and their default values.
-All settings can directly be set in the CLI, e.g. add `generate.n_molecules=1000` to the call to generate a thousand instead of a hundred molecules.
+In the following table, we list all settings for the generation script and their default values (where `???` marks entries that have no default value and thus are required when calling the script).
+All settings can directly be set in the CLI, e.g. add `view_molecules=True` to display the molecules after generation.
 
 | Name | Value | Description |
 | :--- | :--- | :--- |
-| `generate.n_molecules` | `100` | The number of molecules that shall be generated. Note that the number of molecules in the resulting data base can be lower as failed generation attempts are not stored, i.e. where the model has not finished generation after placing `max_n_atoms` atoms. |
-| `generate.batch_size` | `10` | The number of molecules generated in one batch. Use large batches if possible and decrease the batch size if your GPU runs out of memory. |
-| `generate.max_n_atoms` | `35` | The maximum number of atoms the model is allowed to place. If it has not finished after placing this many atoms, it will discard the structure as a failed generation attempt. |
-| `generate.grid_distance_min` | `0.7` | The minimum distance between a new atom and the focus atom. Determines the extent of the 3d grid together with the `placement_cutoff` used during model training, which sets the maximum distance between new atom and focus. |
-| `generate.grid_spacing` | `0.05` | The size of a bin in the 3d grid (i.e. a value of 0.05 means each bin has a size of 0.05x0.05x0.05). |
-| `generate.temperature_term` | `0.1` | The temperature term in the normalization of the 3d grid probability. A smaller value leads to more pronounced peaks whereas a larger value increases randomness by smoothing the distribution. |
-| `generate.grid_batch_size` | `0` | For the reconstruction of the positional distributions, one 3d grid is constructed for every preceding atom (within the `prediction cutoff` of the model). This operation consumes a lot of memory and therefore is a bottleneck when it comes to the number of molecules that can be generated at the same time. When setting this argument to an integer `x > 0`, at most `x` 3d grids are constructed at the same time, which allows to control the memory demand of the generation process. The default value of `0` means that all grids are computed at once. |
+| `modeldir` | `???` | The directory where the trained model is stored (the directory containing the files _best\_model_, _cli.log_, _config.yaml_ etc.). |
+| `n_molecules` | `???` | The number of molecules that shall be generated. Note that the number of molecules in the resulting data base can be lower as failed generation attempts are not stored, i.e. where the model has not finished generation after placing `max_n_atoms` atoms. |
+| `batch_size` | `???` | The number of molecules generated in one batch. Can be significantly larger than training batches. Use large batches if possible and decrease the batch size if your GPU runs out of memory. |
+| `max_n_atoms` | `???` | The maximum number of atoms the model is allowed to place. If it has not finished after placing this many atoms, it will discard the structure as a failed generation attempt. Usually, you set this larger than the largest molecules in the training data set. |
 | `outputfile` | `null` | Name of the data base where generated molecules are stored. The data base will always be stored at `<path/to/trained/model>/generated_molecules/`. If `null`, the script will automatically assign a number to the data base (it starts to count from 1 and increases the count by one if a data base with the number already exists). |
 | `use_gpu` | `True` | Set `True` to run generation on the GPU. |
 | `view_molecules` | `False` | Set `True` to automatically open a pop-up window with visualizations of all generated structures (uses the `ASE` package for visualization). |
-| `workdir` | `null` | Path to a directory. If not `null`, the data base will first be written to this directory and then copied to `<path/to/trained/model>/generated_molecules/`. This can speed up the generation if the storage of `<path/to/trained/model>` is slow, e.g. a shared drive on a cluster, and `workdir` is on a fast local storage. If the directory does not exist, it will be created automatically. |
-| `remove_workdir` | `False` | If `True`, the `workdir` is automatically removed after the data base has been copied to `<path/to/trained/model>/generated_molecules`. |
+| `grid_distance_min` | `0.7` | The minimum distance between a new atom and the focus atom. Determines the extent of the 3d grid together with the `placement_cutoff` used during model training, which sets the maximum distance between new atom and focus. |
+| `grid_spacing` | `0.05` | The size of a bin in the 3d grid (i.e. a value of 0.05 means each bin has a size of 0.05x0.05x0.05). |
+| `temperature_term` | `0.1` | The temperature term in the normalization of the 3d grid probability. A smaller value leads to more pronounced peaks whereas a larger value increases randomness by smoothing the distribution. |
 
 # Additional information
 

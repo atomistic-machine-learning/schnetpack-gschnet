@@ -23,7 +23,7 @@ setup(
     name="schnetpack-gschnet",
     packages=find_packages("src"),
     package_dir={"": "src"},
-    version="1.0.0",
+    version="1.1.0",
     author="Niklas Gebauer",
     scripts=[
         "src/scripts/gschnet_train",

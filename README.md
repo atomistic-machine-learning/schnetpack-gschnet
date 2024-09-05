@@ -37,12 +37,10 @@ For reproduction of the results reported in our publications, please refer to th
 # Installation
 
 To install `schnetpack-gschnet`, download this repository and use pip.
-For example, the following commands will clone the repository into your current working directory, create a new conda environment called `gschnet`, and install this package as well as all its dependencies (e.g. SchNetPack 2.0, PyTorch, etc.) in the new environment (tested on Ubuntu 20.04):
+For example, the following commands will clone the repository into your current working directory and install this package as well as all its dependencies (e.g. SchNetPack 2.0, PyTorch, etc.):
 
 ```
 git clone https://github.com/atomistic-machine-learning/schnetpack-gschnet.git
-conda create -n gschnet
-conda activate gschnet
 pip install ./schnetpack-gschnet
 ```
 

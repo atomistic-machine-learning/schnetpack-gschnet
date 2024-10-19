@@ -1,10 +1,10 @@
+defaults:
+  - custom_data
+  - _self_
+
 _target_: schnetpack_gschnet.datasets.QM9Gen
 
-placement_cutoff: ${globals.placement_cutoff}
-use_covalent_radii: ${globals.use_covalent_radii}
-covalent_radius_factor: ${globals.covalent_radius_factor}
 datapath: ${run.data_dir}/qm9.db  # data_dir is specified in train.yaml
-data_workdir: ${globals.data_workdir}  # is specified in yaml-file of the experiment
 batch_size: 5
 num_train: 50000
 num_val: 5000

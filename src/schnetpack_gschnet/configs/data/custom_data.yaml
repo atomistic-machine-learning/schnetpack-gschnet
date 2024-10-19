@@ -13,6 +13,7 @@ num_val: ???     # number of molecules used for validation (rest is put into tes
 
 transforms:
   - _target_: schnetpack.transform.SubtractCenterOfMass
+  - _target_: schnetpack_gschnet.transform.OrderByDistanceToOrigin
   - _target_: schnetpack_gschnet.transform.ConditionalGSchNetNeighborList
     model_cutoff: ${globals.model_cutoff}
     prediction_cutoff: ${globals.prediction_cutoff}
@@ -20,9 +21,10 @@ transforms:
     use_covalent_radii: ${globals.use_covalent_radii}
     covalent_radius_factor: ${globals.covalent_radius_factor}
   - _target_: schnetpack_gschnet.transform.BuildAtomsTrajectory
-    centered: True
     origin_type: ${globals.origin_type}
     focus_type: ${globals.focus_type}
     stop_type: ${globals.stop_type}
     draw_random_samples: ${globals.draw_random_samples}
   - _target_: schnetpack.transform.CastTo32
+
+train_sampler_cls: null

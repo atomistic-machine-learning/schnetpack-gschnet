@@ -60,6 +60,7 @@ class GenerativeAtomsDataModule(AtomsDataModule):
         splitting: Optional[SplittingStrategy] = None,
         pin_memory: Optional[bool] = None,
         force_preprocessing: Optional[bool] = False,
+        **kwargs,
     ):
         """
         Args:
@@ -139,6 +140,7 @@ class GenerativeAtomsDataModule(AtomsDataModule):
             cleanup_workdir_stage=cleanup_workdir_stage,
             splitting=splitting,
             pin_memory=pin_memory,
+            **kwargs,
         )
 
         self.placement_cutoff = placement_cutoff

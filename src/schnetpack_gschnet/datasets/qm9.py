@@ -91,6 +91,7 @@ class QM9Gen(GenerativeAtomsDataModule):
         splitting: Optional[SplittingStrategy] = None,
         pin_memory: Optional[bool] = None,
         force_preprocessing: Optional[bool] = False,
+        **kwargs,
     ):
         """
 
@@ -176,6 +177,7 @@ class QM9Gen(GenerativeAtomsDataModule):
             splitting=splitting,
             pin_memory=pin_memory,
             force_preprocessing=force_preprocessing,
+            **kwargs,
         )
 
         self.remove_uncharacterized = remove_uncharacterized

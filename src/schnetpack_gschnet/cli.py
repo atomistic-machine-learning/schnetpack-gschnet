@@ -121,7 +121,7 @@ def generate(config: DictConfig):
                 )
 
     # parse composition (if it is included in conditions)
-    if "conditions" not in config:
+    if "conditions" not in config or config.conditions is None:
         with open_dict(config):
             config.conditions = {}
     original_conditions = OmegaConf.to_container(

@@ -23,6 +23,7 @@ setup(
     name="schnetpack-gschnet",
     packages=find_packages("src"),
     package_dir={"": "src"},
+    package_data={"schnetpack_gschnet": ["configs/**/*.yaml"]},
     version="1.1.0",
     author="Niklas Gebauer",
     scripts=[

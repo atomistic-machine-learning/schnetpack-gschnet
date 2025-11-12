@@ -103,7 +103,7 @@ class GeneralCachedNeighborList(Transform):
 
         # try to read cached NBL
         try:
-            data = torch.load(cache_file)
+            data = torch.load(cache_file, weights_only=True)
             inputs.update(data)
         except IOError:
             # acquire lock for caching
@@ -115,7 +115,7 @@ class GeneralCachedNeighborList(Transform):
             with lock:
                 # retry reading, in case other process finished in the meantime
                 try:
-                    data = torch.load(cache_file)
+                    data = torch.load(cache_file, weights_only=True)
                     inputs.update(data)
                 except IOError:
                     # now it is save to calculate and cache

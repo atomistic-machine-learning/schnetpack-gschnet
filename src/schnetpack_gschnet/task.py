@@ -163,30 +163,77 @@ class ConditionalGenerativeSchNetTask(AtomisticTask):
             return type_loss + dist_loss
 
     def training_step(self, batch, batch_idx):
+        print(batch)
+        print(len(batch["_idx"]))
         pred = self.predict_without_postprocessing(batch)
         loss = self.loss_fn(pred, batch)
-        self.log("train_loss", loss, on_step=False, on_epoch=True, prog_bar=False)
+        self.log(
+            "train_loss",
+            loss,
+            on_step=False,
+            on_epoch=True,
+            prog_bar=False,
+            batch_size=len(batch["_idx"]),
+        )
         return loss
 
     def validation_step(self, batch, batch_idx):
         torch.set_grad_enabled(self.grad_enabled)
         pred = self.predict_without_postprocessing(batch)
         loss = self.loss_fn(pred, batch, return_individual_losses=True)
-        self.log("val_loss", loss[0], on_step=False, on_epoch=True, prog_bar=True)
-        self.log("val_loss_type", loss[1], on_step=False, on_epoch=True, prog_bar=False)
-        self.log("val_loss_dist", loss[2], on_step=False, on_epoch=True, prog_bar=False)
+        self.log(
+            "val_loss",
+            loss[0],
+            on_step=False,
+            on_epoch=True,
+            prog_bar=True,
+            batch_size=len(batch["_idx"]),
+        )
+        self.log(
+            "val_loss_type",
+            loss[1],
+            on_step=False,
+            on_epoch=True,
+            prog_bar=False,
+            batch_size=len(batch["_idx"]),
+        )
+        self.log(
+            "val_loss_dist",
+            loss[2],
+            on_step=False,
+            on_epoch=True,
+            prog_bar=False,
+            batch_size=len(batch["_idx"]),
+        )
         return {"val_loss": loss[0]}
 
     def test_step(self, batch, batch_idx):
         torch.set_grad_enabled(self.grad_enabled)
         pred = self.predict_without_postprocessing(batch)
         loss = self.loss_fn(pred, batch, return_individual_losses=True)
-        self.log("test_loss", loss[0], on_step=False, on_epoch=True, prog_bar=True)
         self.log(
-            "test_loss_type", loss[1], on_step=False, on_epoch=True, prog_bar=False
+            "test_loss",
+            loss[0],
+            on_step=False,
+            on_epoch=True,
+            prog_bar=True,
+            batch_size=len(batch["_idx"]),
         )
         self.log(
-            "test_loss_dist", loss[2], on_step=False, on_epoch=True, prog_bar=False
+            "test_loss_type",
+            loss[1],
+            on_step=False,
+            on_epoch=True,
+            prog_bar=False,
+            batch_size=len(batch["_idx"]),
+        )
+        self.log(
+            "test_loss_dist",
+            loss[2],
+            on_step=False,
+            on_epoch=True,
+            prog_bar=False,
+            batch_size=len(batch["_idx"]),
         )
         return {"test_loss": loss[0]}
 

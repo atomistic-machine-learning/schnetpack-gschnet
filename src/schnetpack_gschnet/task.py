@@ -163,8 +163,6 @@ class ConditionalGenerativeSchNetTask(AtomisticTask):
             return type_loss + dist_loss
 
     def training_step(self, batch, batch_idx):
-        print(batch)
-        print(len(batch["_idx"]))
         pred = self.predict_without_postprocessing(batch)
         loss = self.loss_fn(pred, batch)
         self.log(

@@ -28,7 +28,7 @@ from schnetpack_gschnet.generate_molecules import (
 
 log = logging.getLogger(__name__)
 
-OmegaConf.register_new_resolver("uuid", lambda x: str(uuid.uuid1()))
+OmegaConf.register_new_resolver("uuid", lambda x: str(uuid.uuid1()), use_cache=True)
 OmegaConf.register_new_resolver("tmpdir", tempfile.mkdtemp, use_cache=True)
 
 
@@ -55,21 +55,23 @@ def generate(config: DictConfig):
             config,
             resolve=False,
             fields=(
-                "modeldir",
-                "n_molecules",
-                "batch_size",
-                "max_n_atoms",
-                "conditions",
-            )
-            if config.workdir is None
-            else (
-                "modeldir",
-                "workdir",
-                "remove_workdir",
-                "n_molecules",
-                "batch_size",
-                "max_n_atoms",
-                "conditions",
+                (
+                    "modeldir",
+                    "n_molecules",
+                    "batch_size",
+                    "max_n_atoms",
+                    "conditions",
+                )
+                if config.workdir is None
+                else (
+                    "modeldir",
+                    "workdir",
+                    "remove_workdir",
+                    "n_molecules",
+                    "batch_size",
+                    "max_n_atoms",
+                    "conditions",
+                )
             ),
         )
 
